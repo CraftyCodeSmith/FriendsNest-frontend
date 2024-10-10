@@ -1,12 +1,12 @@
 import { Outlet } from "react-router-dom";
+import { Toaster } from "@/components/ui/toaster";
 
 const AuthLayout = () => {
   return (
-    <>
-      <div>Auth Header</div>
+    <main className="h-screen sm:px-10 flex justify-center items-center">
       <Outlet />
-      <div>Auth Footer</div>
-    </>
+      <Toaster />
+    </main>
   );
 };
 
