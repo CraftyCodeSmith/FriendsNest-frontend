@@ -8,7 +8,7 @@ const authenticationRoutes: RouteObject[] = [
     path: "/",
     element: <AuthLayout />,
     children: [
-      { path: "login", element: <LoginPage /> },
+      { path: "", element: <LoginPage /> },
       { path: "register", element: <RegisterPage /> },
     ],
   },

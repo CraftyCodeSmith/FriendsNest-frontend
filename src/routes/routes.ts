@@ -1,7 +1,7 @@
 import { createBrowserRouter, RouteObject } from "react-router-dom";
 import authenticationRoutes from "../authentication/routes";
 import chatRoutes from "../chat/routes";
-import streamingRoutes from "../video/routes";
+import streamingRoutes from "../rtc/routes";
 
 const routes: RouteObject[] = [
   ...authenticationRoutes,
