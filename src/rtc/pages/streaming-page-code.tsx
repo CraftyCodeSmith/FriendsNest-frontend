@@ -30,127 +30,145 @@ const StreamingPage: React.FC = () => {
   const [ownClientId, setOwnClientId] = useState<string>("");
   const [targetClientId, setTargetClientId] = useState<string>("");
 
-  // useEffect(() => {
-  //   // Generate and set own client ID
-  //   const clientId = uuidv4();
-  //   setOwnClientId(clientId);
-
-  //   // Function to handle cleanup
-  //   const cleanup = () => {
-  //     if (stompClientRef.current) {
-  //       stompClientRef.current.deactivate(); // Properly disconnect
-  //     }
-
-  //     if (peerConnectionRef.current) {
-  //       peerConnectionRef.current.close();
-  //       console.log("Closed RTCPeerConnection");
-  //     }
-  //   };
-
-  //   // Initialize WebSocket and PeerConnection
-  //   const initialize = async () => {
-  //     try {
-  //       // Establish WebSocket connection
-  //       // const socket = new SockJS("http://192.168.1.54:8080/video-websocket");
-
-  //       // const client = new StompClient({
-  //       //   webSocketFactory: () => socket,
-  //       //   debug: (str: string) => {
-  //       //     console.log("STOMP:", str);
-  //       //   },
-  //       //   brokerURL: "ws://192.168.1.54:8080/video-websocket",
-  //       // });
-
-  //       const client = new StompClient({
-  //         brokerURL: "ws://localhost:8080/video-websocket",
-  //       });
-
-  //       // client.onConnect = (frame) => {
-  //       //     setConnected(true);
-  //       //     console.log('Connected: ' + frame);
-  //       //     stompClient.subscribe('/topic/greetings', (greeting) => {
-  //       //         showGreeting(JSON.parse(greeting.body).content);
-  //       //     });
-  //       // };
-  //       client.onConnect = () => {
-  //         console.log("Connected to WebSocket");
-  //         setConnectionStatus("Connected");
-  //         stompClientRef.current = client;
-  //       };
-
-  //       // client.onStompError = (frame) => {
-  //       //   console.error("Broker reported error: " + frame.headers["message"]);
-  //       //   console.error("Additional details: " + frame.body);
-  //       //   setError("Broker reported error");
-  //       // };
-
-  //       client.activate();
-
-  //       // Get user media
-  //     } catch (e) {
-  //       console.error("Initialization error:", e);
-  //       setError("Initialization error");
-  //     }
-  //   };
-
-  //   initialize();
-
-  //   // Cleanup on unmount
-  //   return () => {
-  //     cleanup();
-  //   };
-  // }, [targetClientId]);
-
   useEffect(() => {
-    // Step 1: Create a STOMP client using native WebSocket
-    const client = new StompClient({
-      brokerURL: "ws://localhost:8080/video-websocket", // Native WebSocket URL
-      reconnectDelay: 5000, // Reconnect every 5 seconds if connection is lost
-      heartbeatIncoming: 10000, // Heartbeat interval for incoming messages
-      heartbeatOutgoing: 10000, // Heartbeat interval for outgoing messages
-      debug: (str) => {
-        console.log("STOMP:", str);
-      },
-      onConnect: (frame) => {
-        console.log("Connected to WebSocket:", frame);
-        setConnectionStatus("Connected");
-        stompClientRef.current = client;
+    // Generate and set own client ID
+    const clientId = uuidv4();
+    setOwnClientId(clientId);
 
-        // Subscribe to /topic/connected
-        // client.subscribe("/topic/connected", (message) => {
-        //   const body = message.body;
-        //   console.log("Received message from /topic/connected:", body);
-        //   setMessages((prevMessages) => [...prevMessages, body]);
-        // });
+    // Function to handle cleanup
+    const cleanup = () => {
+      if (stompClientRef.current) {
+        stompClientRef.current.deactivate(); // Properly disconnect
+      }
 
-        // Subscribe to /topic/video
-        client.subscribe("/topic/video", (message) => {
-          const body = message.body;
-          console.log("Received message from /topic/video:", body);
-          // Handle video-related messages here
-        });
-
-        // Send a connect message to the server
-        const clientId = uuidv4();
-        // const clientId = "scissoring-with-tarun"; // Replace with your actual client ID
-        client.publish({
-          destination: "/app/connect",
-          body: JSON.stringify({ clientId }),
-        });
-      },
-    });
-
-    // Step 2: Activate the client to initiate the connection
-    client.activate();
-
-    // Step 3: Cleanup on component unmount
-    return () => {
-      if (client) {
-        client.deactivate();
-        console.log("WebSocket connection closed");
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        console.log("Closed RTCPeerConnection");
       }
     };
-  }, []);
+
+    // Initialize WebSocket and PeerConnection
+    const initialize = async () => {
+      try {
+        // Establish WebSocket connection
+        const socket = new SockJS(
+          "http://192.168.1.54:8080/app/video-websocket"
+        );
+        console.log(socket);
+
+        const client = new StompClient({
+          webSocketFactory: () => socket,
+          debug: (str: string) => {
+            console.log("STOMP:", str);
+          },
+        });
+        console.log(client);
+
+        client.onConnect = () => {
+          console.log("Connected to WebSocket");
+          setConnectionStatus("Connected");
+          stompClientRef.current = client;
+
+          // Subscribe to receive messages intended for this client
+          // client.subscribe(
+          //   `/user/${clientId}/topic/video`,
+          //   (message: IMessage) => {
+          //     try {
+          //       const data: SignalingMessage = JSON.parse(message.body);
+          //       console.log("Received signaling data:", data);
+
+          //       handleSignalingData(data);
+          //     } catch (err) {
+          //       console.error("Error parsing signaling data:", err);
+          //       setError("Error parsing signaling data");
+          //     }
+          //   }
+          // );
+
+          console.log("Connected to signaling server");
+        };
+
+        // client.publish({
+        //   destination: "/app/connect",
+        //   body: JSON.stringify({ clientId }),
+        // });
+
+        client.onStompError = (frame) => {
+          console.error("Broker reported error: " + frame.headers["message"]);
+          console.error("Additional details: " + frame.body);
+          setError("Broker reported error");
+        };
+
+        client.activate();
+
+        // Create RTCPeerConnection
+        const configuration: RTCConfiguration = {
+          iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            // Add TURN servers here if needed
+          ],
+        };
+
+        const pc = new RTCPeerConnection(configuration);
+        peerConnectionRef.current = pc;
+        console.log(
+          "RTCPeerConnection created with configuration:",
+          configuration
+        );
+
+        // Handle ICE candidates
+        pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
+          if (event.candidate) {
+            console.log("ICE Candidate found:", event.candidate);
+            sendSignalingData(
+              {
+                type: "ice-candidate",
+                candidate: event.candidate,
+              },
+              targetClientId
+            );
+          }
+        };
+
+        // Handle remote stream
+        pc.ontrack = (event: RTCTrackEvent) => {
+          console.log("Remote track received:", event);
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = event.streams[0];
+            console.log("Remote video stream set");
+          }
+        };
+
+        // Get user media
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true,
+          });
+          console.log("User media obtained");
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+            console.log("Local video stream set");
+          }
+          stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+          console.log("Local tracks added to RTCPeerConnection");
+        } catch (mediaError) {
+          console.error("Error accessing media devices.", mediaError);
+          setError("Error accessing media devices");
+        }
+      } catch (e) {
+        console.error("Initialization error:", e);
+        setError("Initialization error");
+      }
+    };
+
+    initialize();
+
+    // Cleanup on unmount
+    return () => {
+      cleanup();
+    };
+  }, [targetClientId]);
 
   /**
    * Handle incoming signaling data
