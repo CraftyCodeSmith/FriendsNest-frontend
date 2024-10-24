@@ -32,6 +32,8 @@ const StreamingPage: React.FC = () => {
   // Unique client ID
   const [ownClientId, setOwnClientId] = useState<string>("");
   const [targetClientId, setTargetClientId] = useState<string>("");
+  const [targetSessionId, setTargetSessionId] = useState<SignalingMessage>();
+  let myid: string;
   useEffect(() => {
     console.log(`targetClientId:${targetClientId}`);
   }, [targetClientId]);
@@ -55,22 +57,19 @@ const StreamingPage: React.FC = () => {
           const updatedSessionMap = JSON.parse(message.body);
           console.log("Received updated session map:", updatedSessionMap);
 
-          const ids = Object.keys(updatedSessionMap)
-            .map((key) => {
-              const parsedKey = JSON.parse(key);
-              return parsedKey.clientId;
-            })
-            .filter((id) => id !== ownClientId);
-
+          const ids = Object.keys(updatedSessionMap).filter(
+            (id) => id !== myid
+          );
           setClientIds(ids);
         });
 
         // Subscribe to receive messages intended for this client
-        client.subscribe(`/topic/call`, (message: any) => {
+        client.subscribe(`/user/queue/call`, (message: IMessage) => {
           try {
             const data: SignalingMessage = JSON.parse(
               JSON.stringify(message.body)
             );
+            setTargetSessionId(data);
             console.log("Received signaling data:", data);
 
             // handleSignalingData(data);
@@ -79,14 +78,16 @@ const StreamingPage: React.FC = () => {
             setError("Error parsing signaling data");
           }
         });
+
         // Send a connect message to the server
         const clientId = uuidv4();
         setOwnClientId(clientId);
+        myid = clientId;
         console.log("Client ID:", clientId);
         // const clientId = "scissoring-with-tarun"; // Replace with your actual client ID
         client.publish({
           destination: "/app/connect",
-          body: JSON.stringify({ clientId }),
+          body: JSON.stringify({ sender: clientId }),
         });
       },
     });
@@ -237,14 +238,15 @@ const StreamingPage: React.FC = () => {
         // Include sender and target in the message
         const message = {
           ...data,
-          sender: { clientId: ownClientId },
-          target: { clientId: targetClientId },
+          sender: ownClientId,
+          target: targetClientId,
         };
 
         stompClient.publish({
           destination: "/app/call",
           body: JSON.stringify(message),
         });
+
         console.log("Sent signaling data:", message);
       } else {
         console.error("STOMP client is not connected");
