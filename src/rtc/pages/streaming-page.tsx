@@ -1,332 +1,34 @@
-import { v4 as uuidv4 } from "uuid";
 import React, { useEffect, useRef, useState } from "react";
-import { Client as StompClient, IMessage } from "@stomp/stompjs";
-
-interface SignalingMessage {
-  type: string;
-  sdp?: RTCSessionDescriptionInit;
-  candidate?: RTCIceCandidateInit;
-  sender?: string; // Now string
-  target?: string; // Now string
-}
+import { Client as StompClient } from "@stomp/stompjs";
+import { useStompClient } from "@/hooks/useStompClient ";
+import { usePeerConnection } from "@/hooks/usePeerConnection";
 
 const StreamingPage: React.FC = () => {
   // Refs with explicit types
-  const stompClientRef = useRef<StompClient | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
 
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  // const stompClientRef = useRef<StompClient | null>(null);
 
   // State variables with correct types
   const [error, setError] = useState<string | null>(null as string | null);
-  const [clientIds, setClientIds] = useState<string[]>([]);
-  const [connectionStatus, setConnectionStatus] =
-    useState<string>("DISCONNECTED");
 
   // Unique client ID
-  const [ownClientId, setOwnClientId] = useState<string>("");
   const [targetClientId, setTargetClientId] = useState<string>("");
-  const [targetSessionId, setTargetSessionId] = useState<SignalingMessage>();
 
-  let myid: string;
+  const [ownClientId, connectionStatus, clientIds, stompClientRef] =
+    useStompClient({
+      peerConnectionRef,
+      setError,
+    });
+  const [startCall, localVideoRef, remoteVideoRef] = usePeerConnection({
+    setError,
+    stompClientRef,
+    targetClientId,
+  });
 
   useEffect(() => {
-    // Generate the clientId
-    const clientId = uuidv4();
-    setOwnClientId(clientId);
-    myid = clientId;
-    console.log("Client ID:", clientId);
-
-    // Include the clientId as a query parameter in the WebSocket URL
-    const websocketUrl = `ws://localhost:8080/video-websocket?clientId=${clientId}`;
-
-    // Step 1: Create a STOMP client using native WebSocket with the clientId in the URL
-    const client = new StompClient({
-      brokerURL: websocketUrl, // Include clientId in the WebSocket URL
-      reconnectDelay: 5000, // Reconnect every 5 seconds if connection is lost
-      heartbeatIncoming: 10000, // Heartbeat interval for incoming messages
-      heartbeatOutgoing: 10000, // Heartbeat interval for outgoing messages
-      debug: (str) => {
-        console.log("STOMP:", str);
-      },
-
-      onConnect: () => {
-        setConnectionStatus("CONNECTED");
-        stompClientRef.current = client;
-
-        client.subscribe("/topic/client-update", (message) => {
-          const updatedSessionMap = JSON.parse(message.body);
-          console.log("Received updated session map:", updatedSessionMap);
-
-          const ids = Object.keys(updatedSessionMap).filter(
-            (id) => id !== myid
-          );
-          setClientIds(ids);
-        });
-
-        // Subscribe to receive messages intended for this client
-        client.subscribe(`/user/queue/call`, (message: IMessage) => {
-          try {
-            const data: SignalingMessage = JSON.parse(message.body);
-            setTargetSessionId(data);
-            console.log("Received signaling data:", data);
-            console.log(targetSessionId);
-
-            // Uncomment this line if you have handleSignalingData implemented
-            // handleSignalingData(data);
-          } catch (err) {
-            console.error("Error parsing signaling data:", err);
-            setError("Error parsing signaling data");
-          }
-        });
-
-        // Send a connect message to the server (Optional if handled during handshake)
-        client.publish({
-          destination: "/app/connect",
-          body: JSON.stringify({ sender: clientId }),
-        });
-      },
-    });
-
-    // Step 2: Activate the client to initiate the connection
-    client.activate();
-
-    // RTC setup
-    const makertc = async () => {
-      const configuration: RTCConfiguration = {
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          // Add TURN servers here if needed
-        ],
-      };
-
-      const pc = new RTCPeerConnection(configuration);
-      peerConnectionRef.current = pc;
-      console.log(
-        "RTCPeerConnection created with configuration:",
-        configuration
-      );
-
-      // Handle ICE candidates
-      pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
-        if (event.candidate) {
-          console.log("ICE Candidate found:", event.candidate);
-          sendSignalingData(
-            {
-              type: "ice-candidate",
-              candidate: event.candidate,
-            },
-            targetClientId
-          );
-        }
-      };
-
-      // Set remote stream to ref
-      pc.ontrack = (event: RTCTrackEvent) => {
-        console.log("Remote track received:", event);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-          console.log("Remote video stream set");
-        }
-      };
-
-      // Get user media
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        });
-        console.log("User media obtained");
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-          console.log("Local video stream set");
-        }
-        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-        console.log("Local tracks added to RTCPeerConnection");
-      } catch (mediaError) {
-        console.error("Error accessing media devices.", mediaError);
-        setError("Error accessing media devices");
-      }
-    };
-    makertc();
-
-    // Cleanup on component unmount
-    return () => {
-      if (client) {
-        client.deactivate();
-        console.log("WebSocket connection closed");
-      }
-    };
-  }, []);
-
-  // const handleSignalingData = async (data: SignalingMessage) => {
-  //   try {
-  //     const peerConnection = peerConnectionRef.current;
-  //     if (!peerConnection) {
-  //       console.error("PeerConnection is not established");
-  //       setError("PeerConnection is not established");
-  //       return;
-  //     }
-
-  //     console.log("Handling signaling data:", data);
-
-  //     switch (data.type) {
-  //       case "offer":
-  //         await peerConnection.setRemoteDescription(
-  //           new RTCSessionDescription(data.sdp!)
-  //         );
-  //         console.log("Remote offer set");
-
-  //         // Create an answer
-  //         const answer = await peerConnection.createAnswer();
-  //         await peerConnection.setLocalDescription(answer);
-  //         console.log("Answer created and set as local description");
-
-  //         // Send the answer back to the caller
-  //         if (data.sender) {
-  //           sendSignalingData({ type: "answer", sdp: answer }, data.sender);
-  //         } else {
-  //           console.error("Sender ID is missing in the offer");
-  //           setError("Sender ID is missing in the offer");
-  //         }
-  //         break;
-
-  //       case "answer":
-  //         await peerConnection.setRemoteDescription(
-  //           new RTCSessionDescription(data.sdp!)
-  //         );
-  //         console.log("Remote answer set");
-  //         break;
-
-  //       case "ice-candidate":
-  //         if (data.candidate) {
-  //           try {
-  //             await peerConnection.addIceCandidate(
-  //               new RTCIceCandidate(data.candidate)
-  //             );
-  //             console.log("ICE candidate added");
-  //           } catch (e) {
-  //             console.error("Error adding received ICE candidate", e);
-  //             setError("Error adding received ICE candidate");
-  //           }
-  //         }
-  //         break;
-
-  //       default:
-  //         console.warn("Unknown signaling data type:", data.type);
-  //         break;
-  //     }
-  //   } catch (error) {
-  //     console.error("Error in handleSignalingData:", error);
-  //     setError("Error in handleSignalingData");
-  //   }
-  // };
-
-  // const sendSignalingData = (
-  //   data: Partial<SignalingMessage>,
-  //   targetClientId: string
-  // ) => {
-  //   try {
-  //     const stompClient = stompClientRef.current;
-  //     if (stompClient && stompClient.connected) {
-  //       // Include sender and target in the message
-  //       const message = {
-  //         ...data,
-  //         sender: ownClientId,
-  //         target: targetClientId,
-  //       };
-
-  //       stompClient.publish({
-  //         destination: "/app/call",
-  //         body: JSON.stringify(message),
-  //       });
-
-  //       console.log("Sent signaling data:", message);
-  //     } else {
-  //       console.error("STOMP client is not connected");
-  //       setError("STOMP client is not connected");
-  //     }
-  //   } catch (error) {
-  //     console.error("Error sending signaling data:", error);
-  //     setError("Error sending signaling data");
-  //   }
-  // };
-
-  // const startCall = async () => {
-  //   try {
-  //     const peerConnection = peerConnectionRef.current;
-  //     if (!peerConnection) {
-  //       console.error("PeerConnection is not established");
-  //       setError("PeerConnection is not established");
-  //       return;
-  //     }
-
-  //     //local description set
-  //     // Create an offer
-  //     const offer = await peerConnection.createOffer();
-  //     await peerConnection.setLocalDescription(offer);
-  //     // console.log("Offer created and set as local description");
-
-  //     // Send the offer to the target client
-  //     sendSignalingData({ type: "offer", sdp: offer }, targetClientId);
-  //   } catch (error) {
-  //     console.error("Error creating or sending offer:", error);
-  //     setError("Error creating or sending offer");
-  //   }
-  // };
-
-  const sendSignalingData = (
-    data: Partial<SignalingMessage>,
-    targetClientId: string
-  ) => {
-    try {
-      const stompClient = stompClientRef.current;
-      if (stompClient && stompClient.connected) {
-        // Include sender and target in the message
-        const message = {
-          ...data,
-          sender: ownClientId,
-          target: targetClientId,
-        };
-
-        stompClient.publish({
-          destination: "/app/call",
-          body: JSON.stringify(message),
-        });
-
-        console.log("Sent signaling data:", message);
-      } else {
-        console.error("STOMP client is not connected");
-        setError("STOMP client is not connected");
-      }
-    } catch (error) {
-      console.error("Error sending signaling data:", error);
-      setError("Error sending signaling data");
-    }
-  };
-
-  const startCall = async () => {
-    try {
-      const peerConnection = peerConnectionRef.current;
-      if (!peerConnection) {
-        console.error("PeerConnection is not established");
-        setError("PeerConnection is not established");
-        return;
-      }
-
-      // Create an offer
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-      console.log("Offer created and set as local description");
-
-      // Send the offer to the target client
-      sendSignalingData({ type: "offer", sdp: offer }, targetClientId);
-    } catch (error) {
-      console.error("Error creating or sending offer:", error);
-      setError("Error creating or sending offer");
-    }
-  };
+    console.log("localvideo", localVideoRef);
+  }, [localVideoRef]);
 
   return (
     <main className="flex flex-col items-center p-4">
@@ -350,9 +52,9 @@ const StreamingPage: React.FC = () => {
             {ownClientId}{" "}
           </span>
         </h3>
-        <h3 className="text-lg">Received Client IDs:</h3>
+        <h3 className="text-lg"> Received Client IDs: </h3>
         <ul>
-          {clientIds.map((id, index) => (
+          {clientIds.map((id: any, index: any) => (
             <li key={index} className="text-blue-800 font-bold">
               {id}
             </li>
@@ -368,7 +70,10 @@ const StreamingPage: React.FC = () => {
         <input
           type="text"
           value={targetClientId}
-          onChange={(e) => setTargetClientId(e.target.value)}
+          onChange={(e) => {
+            console.log("Target Client ID:", e.target.value);
+            setTargetClientId(e.target.value);
+          }}
           placeholder="Enter Target Client ID"
           className="w-full p-2 border border-gray-300 rounded"
         />
@@ -388,7 +93,7 @@ const StreamingPage: React.FC = () => {
       {/* Video Streams */}
       <div className="flex gap-4">
         <div className="flex flex-col items-center">
-          <p className="text-white pb-3">Local Video</p>
+          <p className="text-white pb-3"> Local Video </p>
           <video
             ref={localVideoRef}
             autoPlay
@@ -398,7 +103,7 @@ const StreamingPage: React.FC = () => {
           />
         </div>
         <div className="flex flex-col items-center">
-          <p className="text-white pb-3">Remote Video</p>
+          <p className="text-white pb-3"> Remote Video </p>
           <video
             ref={remoteVideoRef}
             autoPlay
@@ -407,7 +112,8 @@ const StreamingPage: React.FC = () => {
           />
         </div>
       </div>
-      <p className="bg-red-300 text-red-950 p-5 mt-5 rounded-md">{error}</p>
+      <div> {/* <Button onClick={handleSignalingData}>Answer</Button> */} </div>
+      <p className="bg-red-300 text-red-950 p-5 mt-5 rounded-md"> {error} </p>
     </main>
   );
 };
