@@ -2,17 +2,12 @@ import { v4 as uuidv4 } from "uuid";
 import React, { useEffect, useRef, useState } from "react";
 import { Client as StompClient, IMessage } from "@stomp/stompjs";
 
-type ClientObject = {
-  [key: string]: string;
-};
-
-// Define the structure of signaling m9e9b0b1e-91b4-437f-b009-aa719e8618ecessages
 interface SignalingMessage {
-  type: "offer" | "answer" | "ice-candidate";
+  type: string;
   sdp?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit;
-  sender?: string;
-  target?: string;
+  sender?: string; // Now string
+  target?: string; // Now string
 }
 
 const StreamingPage: React.FC = () => {
@@ -27,30 +22,37 @@ const StreamingPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null as string | null);
   const [clientIds, setClientIds] = useState<string[]>([]);
   const [connectionStatus, setConnectionStatus] =
-    useState<string>("Disconnected");
+    useState<string>("DISCONNECTED");
 
   // Unique client ID
   const [ownClientId, setOwnClientId] = useState<string>("");
   const [targetClientId, setTargetClientId] = useState<string>("");
   const [targetSessionId, setTargetSessionId] = useState<SignalingMessage>();
+
   let myid: string;
+
   useEffect(() => {
-    console.log(`targetClientId:${targetClientId}`);
-  }, [targetClientId]);
-  useEffect(() => {
-    // Step 1: Create a STOMP client using native WebSocket
+    // Generate the clientId
+    const clientId = uuidv4();
+    setOwnClientId(clientId);
+    myid = clientId;
+    console.log("Client ID:", clientId);
+
+    // Include the clientId as a query parameter in the WebSocket URL
+    const websocketUrl = `ws://localhost:8080/video-websocket?clientId=${clientId}`;
+
+    // Step 1: Create a STOMP client using native WebSocket with the clientId in the URL
     const client = new StompClient({
-      brokerURL: "ws://localhost:8080/video-websocket", // Native WebSocket URL
+      brokerURL: websocketUrl, // Include clientId in the WebSocket URL
       reconnectDelay: 5000, // Reconnect every 5 seconds if connection is lost
       heartbeatIncoming: 10000, // Heartbeat interval for incoming messages
       heartbeatOutgoing: 10000, // Heartbeat interval for outgoing messages
       debug: (str) => {
-        // console.log("STOMP:", str);
+        console.log("STOMP:", str);
       },
 
-      onConnect: (frame) => {
-        // console.log("Connected to WebSocket:", frame);
-        setConnectionStatus("Connected");
+      onConnect: () => {
+        setConnectionStatus("CONNECTED");
         stompClientRef.current = client;
 
         client.subscribe("/topic/client-update", (message) => {
@@ -66,12 +68,12 @@ const StreamingPage: React.FC = () => {
         // Subscribe to receive messages intended for this client
         client.subscribe(`/user/queue/call`, (message: IMessage) => {
           try {
-            const data: SignalingMessage = JSON.parse(
-              JSON.stringify(message.body)
-            );
+            const data: SignalingMessage = JSON.parse(message.body);
             setTargetSessionId(data);
             console.log("Received signaling data:", data);
+            console.log(targetSessionId);
 
+            // Uncomment this line if you have handleSignalingData implemented
             // handleSignalingData(data);
           } catch (err) {
             console.error("Error parsing signaling data:", err);
@@ -79,12 +81,7 @@ const StreamingPage: React.FC = () => {
           }
         });
 
-        // Send a connect message to the server
-        const clientId = uuidv4();
-        setOwnClientId(clientId);
-        myid = clientId;
-        console.log("Client ID:", clientId);
-        // const clientId = "scissoring-with-tarun"; // Replace with your actual client ID
+        // Send a connect message to the server (Optional if handled during handshake)
         client.publish({
           destination: "/app/connect",
           body: JSON.stringify({ sender: clientId }),
@@ -95,7 +92,7 @@ const StreamingPage: React.FC = () => {
     // Step 2: Activate the client to initiate the connection
     client.activate();
 
-    // rtc description ***********************************************************************************************************
+    // RTC setup
     const makertc = async () => {
       const configuration: RTCConfiguration = {
         iceServers: [
@@ -111,7 +108,6 @@ const StreamingPage: React.FC = () => {
         configuration
       );
 
-      //exchanging the ice candidate ************************************************************************************************
       // Handle ICE candidates
       pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
         if (event.candidate) {
@@ -126,7 +122,7 @@ const StreamingPage: React.FC = () => {
         }
       };
 
-      //setting the remote stream to ref******************************************************************************************
+      // Set remote stream to ref
       pc.ontrack = (event: RTCTrackEvent) => {
         console.log("Remote track received:", event);
         if (remoteVideoRef.current) {
@@ -134,8 +130,7 @@ const StreamingPage: React.FC = () => {
           console.log("Remote video stream set");
         }
       };
-      //************************************************************************************************* */
-      //setting the local media**********************************************************************
+
       // Get user media
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -153,14 +148,14 @@ const StreamingPage: React.FC = () => {
         console.error("Error accessing media devices.", mediaError);
         setError("Error accessing media devices");
       }
-      //************************************************************************************************* */
     };
     makertc();
-    // Step 3: Cleanup on component unmount
+
+    // Cleanup on component unmount
     return () => {
       if (client) {
         client.deactivate();
-        // console.log("WebSocket connection closed");
+        console.log("WebSocket connection closed");
       }
     };
   }, []);
@@ -228,6 +223,59 @@ const StreamingPage: React.FC = () => {
   //   }
   // };
 
+  // const sendSignalingData = (
+  //   data: Partial<SignalingMessage>,
+  //   targetClientId: string
+  // ) => {
+  //   try {
+  //     const stompClient = stompClientRef.current;
+  //     if (stompClient && stompClient.connected) {
+  //       // Include sender and target in the message
+  //       const message = {
+  //         ...data,
+  //         sender: ownClientId,
+  //         target: targetClientId,
+  //       };
+
+  //       stompClient.publish({
+  //         destination: "/app/call",
+  //         body: JSON.stringify(message),
+  //       });
+
+  //       console.log("Sent signaling data:", message);
+  //     } else {
+  //       console.error("STOMP client is not connected");
+  //       setError("STOMP client is not connected");
+  //     }
+  //   } catch (error) {
+  //     console.error("Error sending signaling data:", error);
+  //     setError("Error sending signaling data");
+  //   }
+  // };
+
+  // const startCall = async () => {
+  //   try {
+  //     const peerConnection = peerConnectionRef.current;
+  //     if (!peerConnection) {
+  //       console.error("PeerConnection is not established");
+  //       setError("PeerConnection is not established");
+  //       return;
+  //     }
+
+  //     //local description set
+  //     // Create an offer
+  //     const offer = await peerConnection.createOffer();
+  //     await peerConnection.setLocalDescription(offer);
+  //     // console.log("Offer created and set as local description");
+
+  //     // Send the offer to the target client
+  //     sendSignalingData({ type: "offer", sdp: offer }, targetClientId);
+  //   } catch (error) {
+  //     console.error("Error creating or sending offer:", error);
+  //     setError("Error creating or sending offer");
+  //   }
+  // };
+
   const sendSignalingData = (
     data: Partial<SignalingMessage>,
     targetClientId: string
@@ -258,9 +306,6 @@ const StreamingPage: React.FC = () => {
     }
   };
 
-  /**
-   * Initiate the call by creating an SDP offer
-   */
   const startCall = async () => {
     try {
       const peerConnection = peerConnectionRef.current;
@@ -270,11 +315,10 @@ const StreamingPage: React.FC = () => {
         return;
       }
 
-      //local description set
       // Create an offer
       const offer = await peerConnection.createOffer();
       await peerConnection.setLocalDescription(offer);
-      // console.log("Offer created and set as local description");
+      console.log("Offer created and set as local description");
 
       // Send the offer to the target client
       sendSignalingData({ type: "offer", sdp: offer }, targetClientId);
@@ -286,30 +330,40 @@ const StreamingPage: React.FC = () => {
 
   return (
     <main className="flex flex-col items-center p-4">
-      <div className="bg-gray-100 p-4 rounded-lg">
-        <h2>
+      <div className="bg-gray-100 p-4 w-[600px] text-center rounded-lg">
+        <h2 className="text-center pb-3">
           {" "}
-          Connection Status:{" "}
-          <span className="text-green-500"> {connectionStatus} </span>
+          STATUS:{" "}
+          {connectionStatus === "DISCONNECTED" ? (
+            <span className="text-red-500 font-bold"> {connectionStatus} </span>
+          ) : (
+            <span className="text-green-700 font-bold">
+              {" "}
+              {connectionStatus}{" "}
+            </span>
+          )}
         </h2>
-        <h3>Own Client ID: {ownClientId}</h3>
-        <h3>Received Client IDs:</h3>
+        <h3 className="text-lg pb-3">
+          Own Client ID:{" "}
+          <span className="text-md text-green-800 font-semibold">
+            {" "}
+            {ownClientId}{" "}
+          </span>
+        </h3>
+        <h3 className="text-lg">Received Client IDs:</h3>
         <ul>
           {clientIds.map((id, index) => (
-            <li key={index}>{id}</li>
+            <li key={index} className="text-blue-800 font-bold">
+              {id}
+            </li>
           ))}
         </ul>
       </div>
-      {/* Display connection status and errors */}
-      <div className="w-full mb-4">
-        <p className="text-gray-800">Connection Status: {connectionStatus}</p>
-        {error && <p className="text-red-500">Error: {error}</p>}
-      </div>
 
       {/* Input to Specify Target Client ID */}
-      <div className="mb-4 w-full max-w-md">
-        <label className="block text-gray-700 font-semibold mb-2">
-          Target Client ID:
+      <div className="flex items-center pt-5 pb-5 gap-3 w-3/4">
+        <label className="text-slate-100 bg-black p-2 rounded-md w-[140px]">
+          Target ID:
         </label>
         <input
           type="text"
@@ -318,12 +372,23 @@ const StreamingPage: React.FC = () => {
           placeholder="Enter Target Client ID"
           className="w-full p-2 border border-gray-300 rounded"
         />
+        <button
+          onClick={startCall}
+          disabled={!targetClientId}
+          className={`${
+            targetClientId
+              ? "bg-blue-500 hover:bg-blue-600"
+              : "bg-gray-400 cursor-not-allowed"
+          } text-white p-2 w-[200px] rounded`}
+        >
+          Start Call
+        </button>
       </div>
 
       {/* Video Streams */}
       <div className="flex gap-4">
         <div className="flex flex-col items-center">
-          <p>Local Video</p>
+          <p className="text-white pb-3">Local Video</p>
           <video
             ref={localVideoRef}
             autoPlay
@@ -333,7 +398,7 @@ const StreamingPage: React.FC = () => {
           />
         </div>
         <div className="flex flex-col items-center">
-          <p>Remote Video</p>
+          <p className="text-white pb-3">Remote Video</p>
           <video
             ref={remoteVideoRef}
             autoPlay
@@ -342,21 +407,7 @@ const StreamingPage: React.FC = () => {
           />
         </div>
       </div>
-
-      {/* Call Controls */}
-      <div className="mt-4">
-        <button
-          onClick={startCall}
-          disabled={!targetClientId}
-          className={`${
-            targetClientId
-              ? "bg-blue-500 hover:bg-blue-600"
-              : "bg-gray-400 cursor-not-allowed"
-          } text-white px-6 py-2 rounded`}
-        >
-          Start Call
-        </button>
-      </div>
+      <p className="bg-red-300 text-red-950 p-5 mt-5 rounded-md">{error}</p>
     </main>
   );
 };
