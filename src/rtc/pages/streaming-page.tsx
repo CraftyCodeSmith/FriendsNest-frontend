@@ -5,7 +5,7 @@ import { usePeerConnection } from "@/hooks/usePeerConnection";
 
 const StreamingPage: React.FC = () => {
   // Refs with explicit types
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  // const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
 
   // const stompClientRef = useRef<StompClient | null>(null);
 
@@ -20,11 +20,13 @@ const StreamingPage: React.FC = () => {
       peerConnectionRef,
       setError,
     });
-  const [startCall, localVideoRef, remoteVideoRef] = usePeerConnection({
-    setError,
-    stompClientRef,
-    targetClientId,
-  });
+  const [startCall, localVideoRef, remoteVideoRef, peerConnectionRef] =
+    usePeerConnection({
+      setError,
+      stompClientRef,
+      ownClientId,
+      targetClientId,
+    });
 
   useEffect(() => {
     console.log("localvideo", localVideoRef);

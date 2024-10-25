@@ -15,13 +15,13 @@ interface IPeerConnection {
     stompClientRef: Client | null,
     ownClientId: string,
     targetClientId: string,
-    peerConnectionRef: any
+
 }
 
 export const usePeerConnection: any = ({ setError,
     // sendSignalingData,
-    stompClientRef, targetClientId, peerConnectionRef }: IPeerConnection) => {
-    // const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+    stompClientRef, ownClientId, targetClientId }: IPeerConnection) => {
+    const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
     const localVideoRef = useRef<HTMLVideoElement | null>(null);
     const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
     const makertc = async () => {
@@ -33,7 +33,7 @@ export const usePeerConnection: any = ({ setError,
         };
 
         const pc = new RTCPeerConnection(configuration);
-        peerConnectionRef = pc;
+        peerConnectionRef.current = pc;
         console.log(
             "RTCPeerConnection created with configuration:",
             configuration
@@ -46,7 +46,7 @@ export const usePeerConnection: any = ({ setError,
                 sendSignalingData(stompClientRef, {
                     type: "ice-candidate",
                     candidate: event.candidate,
-                }, setError);
+                }, setError, ownClientId, targetClientId);
             }
         };
 
@@ -83,7 +83,7 @@ export const usePeerConnection: any = ({ setError,
 
     const startCall = async () => {
         try {
-            const peerConnection = peerConnectionRef;
+            const peerConnection = peerConnectionRef.current;
             if (!peerConnection) {
                 console.error("PeerConnection is not established");
                 setError("PeerConnection is not established");
@@ -96,12 +96,12 @@ export const usePeerConnection: any = ({ setError,
             console.log("Offer created and set as local description");
 
             // Send the offer to the target client
-            sendSignalingData(stompClientRef, { type: "offer", sdp: offer }, setError, "", targetClientId);
+            sendSignalingData(stompClientRef, { type: "offer", sdp: offer }, setError, ownClientId, targetClientId);
         } catch (error) {
             console.error("Error creating or sending offer:", error);
             setError("Error creating or sending offer");
         }
     };
-    return [startCall, localVideoRef, remoteVideoRef]
+    return [startCall, localVideoRef, remoteVideoRef, peerConnectionRef]
 
 }
