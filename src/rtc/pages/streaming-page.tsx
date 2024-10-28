@@ -277,10 +277,7 @@ const StreamingPage: React.FC = () => {
     }
   };
 
-  const startCall = async (
-    // targetId: any,
-    showToastForClient: (id: string) => void
-  ) => {
+  const startCall = async () => {
     try {
       const peerConnection = peerConnectionRef.current;
       if (!peerConnection) {
@@ -315,7 +312,7 @@ const StreamingPage: React.FC = () => {
     <section className="h-screen py-[50px] px-[100px] gap-[30px] flex">
       <RtcSidebar
         clientIds={clientIds}
-        startCall={() => startCall(targetId, showToastForClient)}
+        startCall={() => startCall()}
         ownId={ownId}
         connectionStatus={connectionStatus}
         targetId={targetId}
