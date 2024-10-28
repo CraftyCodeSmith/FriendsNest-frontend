@@ -35,6 +35,7 @@ const StreamingPage: React.FC = () => {
   const [targetId, settargetId] = useState<string>("");
   let receivedTargetid: string | undefined = "";
   let myId: string | undefined = "";
+  let target: string | undefined = "";
   const [connectionStatus, setConnectionStatus] = useState<boolean>(false);
   const [targetSessionId, setTargetSessionId] = useState<SignalingMessage>();
   const [isMediaAccessGranted, setIsMediaAccessGranted] =
@@ -54,7 +55,8 @@ const StreamingPage: React.FC = () => {
               await peerConnectionRef.current!.setLocalDescription(answer);
               console.log(ownId, targetId);
 
-              if (targetId) sendSignalingData({ type: "answer", sdp: answer });
+              if (myId && target)
+                sendSignalingData({ type: "answer", sdp: answer });
 
               toast.dismiss(t.id);
             }}
@@ -70,6 +72,9 @@ const StreamingPage: React.FC = () => {
       );
     }
   };
+  useEffect(() => {
+    target = targetId;
+  }, [targetId]);
   //* ==========> use-effects
   useEffect(() => {
     // Generate the clientId
@@ -255,8 +260,8 @@ const StreamingPage: React.FC = () => {
         // Include sender and target in the message
         const message = {
           ...data,
-          sender: ownId,
-          target: targetId,
+          sender: myId,
+          target: target ? target : targetId,
         };
 
         stompClient.publish({
