@@ -1,122 +1,346 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Client as StompClient } from "@stomp/stompjs";
-import { useStompClient } from "@/hooks/useStompClient ";
-import { usePeerConnection } from "@/hooks/usePeerConnection";
+//* package imports
+import { v4 as uuidv4 } from "uuid";
+import toast, { Toast, Toaster } from "react-hot-toast";
+
+//* components imports
+import RtcSidebar from "../components/rtc-sidebar";
+import RtcDynamicVideo from "../components/rtc-dynamic-video";
+import { useEffect, useRef, useState } from "react";
+import { Client, IMessage } from "@stomp/stompjs";
+import RtcToast from "../components/rtc-toast";
+
+interface SignalingMessage {
+  type: string;
+  sdp?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit;
+  sender?: string; // Now string
+  target?: string; // Now string
+}
 
 const StreamingPage: React.FC = () => {
-  // Refs with explicit types
-  // const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  //* ==========> variables
 
-  // const stompClientRef = useRef<StompClient | null>(null);
+  //* ==========> refs
+  const stompClientRef = useRef<Client | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null!);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null!);
+  let popup = false;
+  const localIceCandidateRef = useRef<any>(null);
+  let acceptOrReject: boolean = false;
+  //* ==========> states
+  const [error, setError] = useState<string | null>(null);
+  const [clientIds, setClientIds] = useState<string[]>([]);
+  const [ownId, setownId] = useState<string>("");
+  const [targetId, settargetId] = useState<string>("");
+  let receivedTargetid: string | undefined = "";
+  let myId: string | undefined = "";
+  let target: string | undefined = "";
+  const [connectionStatus, setConnectionStatus] = useState<boolean>(false);
+  const [targetSessionId, setTargetSessionId] = useState<SignalingMessage>();
+  const [isMediaAccessGranted, setIsMediaAccessGranted] =
+    useState<boolean>(false);
+  const [toasttargetId, setToasttargetId] = useState<string | null>(null);
+  const showToast = async () => {
+    console.log("receivedTargetid", receivedTargetid, "ownId", ownId);
+    if (popup && myId == receivedTargetid) {
+      toast.custom(
+        (t: Toast) => (
+          <RtcToast
+            onConfirm={async () => {
+              // handleConfirmAction();
+              console.log("its confirmed");
+              // acceptOrReject = true;
+              const answer = await peerConnectionRef.current!.createAnswer();
+              await peerConnectionRef.current!.setLocalDescription(answer);
+              console.log(ownId, targetId);
 
-  // State variables with correct types
-  const [error, setError] = useState<string | null>(null as string | null);
+              if (myId && target)
+                sendSignalingData({ type: "answer", sdp: answer });
 
-  // Unique client ID
-  const [targetClientId, setTargetClientId] = useState<string>("");
-
-  const [ownClientId, connectionStatus, clientIds, stompClientRef] =
-    useStompClient({
-      peerConnectionRef,
-      setError,
-    });
-  const [startCall, localVideoRef, remoteVideoRef, peerConnectionRef] =
-    usePeerConnection({
-      setError,
-      stompClientRef,
-      ownClientId,
-      targetClientId,
-    });
-
+              toast.dismiss(t.id);
+            }}
+            onClose={() => {
+              acceptOrReject = false;
+              toast.dismiss(t.id);
+            }}
+          />
+        ),
+        {
+          duration: Infinity,
+        }
+      );
+    }
+  };
   useEffect(() => {
-    console.log("localvideo", localVideoRef);
-  }, [localVideoRef]);
+    target = targetId;
+  }, [targetId]);
+  //* ==========> use-effects
+  useEffect(() => {
+    // Generate the clientId
+    const clientId = uuidv4();
+    setownId(clientId);
+    myId = clientId;
+
+    // Include the clientId as a query parameter in the WebSocket URL
+    const websocketUrl = `ws://192.168.1.15:8080/video-websocket?clientId=${clientId}`;
+
+    // Step 1: Create a STOMP client using native WebSocket with the clientId in the URL
+    const client = new Client({
+      brokerURL: websocketUrl, // Include clientId in the WebSocket URL
+      reconnectDelay: 5000, // Reconnect every 5 seconds if connection is lost
+      heartbeatIncoming: 10000, // Heartbeat interval for incoming messages
+      heartbeatOutgoing: 10000, // Heartbeat interval for outgoing messages
+      debug: (str) => {
+        // console.log("STOMP:", str);
+      },
+
+      onConnect: () => {
+        setConnectionStatus(true);
+        stompClientRef.current = client;
+
+        client.subscribe("/topic/client-update", (message) => {
+          const updatedSessionMap = JSON.parse(message.body);
+          // console.log("Received updated session map:", updatedSessionMap);
+
+          const ids = Object.keys(updatedSessionMap).filter(
+            (id) => id !== myId
+          );
+          setClientIds(ids);
+        });
+
+        // Subscribe to receive messages intended for this client
+        client.subscribe(`/user/queue/call`, (message: IMessage) => {
+          try {
+            const data: SignalingMessage = JSON.parse(message.body);
+            setTargetSessionId(data);
+            console.log("Received signaling data:", data);
+            handleSignalingData(data);
+          } catch (err) {
+            console.error("Error parsing signaling data:", err);
+            setError("Error parsing signaling data");
+          }
+        });
+
+        // Send a connect message to the server (Optional if handled during handshake)
+        client.publish({
+          destination: "/app/connect",
+          body: JSON.stringify({ sender: clientId }),
+        });
+      },
+    });
+
+    // Step 2: Activate the client to initiate the connection
+    client.activate();
+    const makertc = async () => {
+      const configuration: RTCConfiguration = {
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          // Add TURN servers here if needed
+        ],
+      };
+      const pc = new RTCPeerConnection(configuration);
+      peerConnectionRef.current = pc;
+      pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
+        if (event.candidate && targetId !== null) {
+          console.log("ICE Candidate found:", event.candidate);
+          localIceCandidateRef.current = event.candidate;
+          if (ownId && targetId)
+            sendSignalingData({
+              type: "ice-candidate",
+              candidate: event.candidate,
+            });
+        }
+      };
+
+      pc.onicegatheringstatechange = () => {
+        console.log("ICE Gathering State:", pc.iceGatheringState);
+      };
+
+      // Set remote stream to ref
+      pc.ontrack = (event: RTCTrackEvent) => {
+        console.log("Remote track received:", event);
+
+        if (!remoteVideoRef.current.srcObject && event.streams.length > 0) {
+          remoteVideoRef.current.srcObject = event.streams[0];
+          console.log(
+            "Remote video stream set",
+            remoteVideoRef.current!.srcObject,
+            event.streams
+          );
+        }
+      };
+
+      // Get user media
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
+        console.log("User media obtained");
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+          console.log(
+            "Local video stream set",
+            localVideoRef.current.srcObject
+          );
+        }
+        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+        setIsMediaAccessGranted(true);
+        console.log("Local tracks added to RTCPeerConnection");
+      } catch (mediaError) {
+        setError("Error accessing media devices");
+        setIsMediaAccessGranted(false);
+        console.error("Error accessing media devices.", mediaError);
+      }
+    };
+    // Handle ICE candidates
+
+    // RTC setup
+
+    makertc();
+
+    // Cleanup on component unmount
+    return () => {
+      if (client) {
+        client.deactivate();
+        console.log("WebSocket connection closed");
+      }
+    };
+  }, []);
+
+  //* ==========> handle functions
+  const handleSignalingData = async (data: SignalingMessage) => {
+    try {
+      const peerConnection = peerConnectionRef.current;
+      if (!peerConnection) {
+        console.error("PeerConnection is not established");
+        setError("PeerConnection is not established");
+        return;
+      }
+
+      switch (data.type) {
+        case "offer":
+          popup = true;
+          receivedTargetid = data.target;
+          console.log("receivedTargetid", receivedTargetid, ownId);
+
+          showToast();
+          await peerConnection.setRemoteDescription(
+            new RTCSessionDescription(data.sdp!)
+          );
+          settargetId(data.sender || "");
+
+          break;
+
+        case "answer":
+          await peerConnection.setRemoteDescription(
+            new RTCSessionDescription(data.sdp!)
+          );
+          break;
+
+        case "ice-candidate":
+          console.log("this will execute");
+          if (data.candidate) {
+            await peerConnection.addIceCandidate(
+              new RTCIceCandidate(data.candidate)
+            );
+          }
+          break;
+      }
+    } catch (error) {
+      console.error("Error handling signaling data:", error);
+    }
+  };
+
+  const sendSignalingData = (data: Partial<SignalingMessage>) => {
+    try {
+      const stompClient = stompClientRef.current;
+      if (stompClient && stompClient.connected) {
+        // Include sender and target in the message
+        const message = {
+          ...data,
+          sender: myId,
+          target: target ? target : targetId,
+        };
+
+        stompClient.publish({
+          destination: "/app/call",
+          body: JSON.stringify(message),
+        });
+
+        console.log("Sent signaling data:", message);
+      } else {
+        console.error("STOMP client is not connected");
+        setError("STOMP client is not connected");
+      }
+    } catch (error) {
+      console.error("Error sending signaling data:", error);
+      setError("Error sending signaling data");
+    }
+  };
+
+  const startCall = async (
+    targetId: string,
+    showToastForClient: (id: string) => void
+  ) => {
+    try {
+      const peerConnection = peerConnectionRef.current;
+      if (!peerConnection) {
+        console.error("PeerConnection is not established");
+        setError("PeerConnection is not established");
+        return;
+      }
+
+      // Create an offer
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      console.log("Offer created and set as local description", offer);
+
+      // Send the offer to the target client
+
+      if (ownId && targetId) sendSignalingData({ type: "offer", sdp: offer });
+
+      // Show toast only for the target client
+      showToastForClient(targetId);
+    } catch (error) {
+      console.error("Error creating or sending offer:", error);
+      setError("Error creating or sending offer");
+    }
+  };
+
+  const showToastForClient = (targetId: string) => {
+    setToasttargetId(targetId);
+  };
 
   return (
-    <main className="flex flex-col items-center p-4">
-      <div className="bg-gray-100 p-4 w-[600px] text-center rounded-lg">
-        <h2 className="text-center pb-3">
-          {" "}
-          STATUS:{" "}
-          {connectionStatus === "DISCONNECTED" ? (
-            <span className="text-red-500 font-bold"> {connectionStatus} </span>
-          ) : (
-            <span className="text-green-700 font-bold">
-              {" "}
-              {connectionStatus}{" "}
-            </span>
-          )}
-        </h2>
-        <h3 className="text-lg pb-3">
-          Own Client ID:{" "}
-          <span className="text-md text-green-800 font-semibold">
-            {" "}
-            {ownClientId}{" "}
-          </span>
-        </h3>
-        <h3 className="text-lg"> Received Client IDs: </h3>
-        <ul>
-          {clientIds.map((id: any, index: any) => (
-            <li key={index} className="text-blue-800 font-bold">
-              {id}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Input to Specify Target Client ID */}
-      <div className="flex items-center pt-5 pb-5 gap-3 w-3/4">
-        <label className="text-slate-100 bg-black p-2 rounded-md w-[140px]">
-          Target ID:
-        </label>
-        <input
-          type="text"
-          value={targetClientId}
-          onChange={(e) => {
-            console.log("Target Client ID:", e.target.value);
-            setTargetClientId(e.target.value);
-          }}
-          placeholder="Enter Target Client ID"
-          className="w-full p-2 border border-gray-300 rounded"
-        />
-        <button
-          onClick={startCall}
-          disabled={!targetClientId}
-          className={`${
-            targetClientId
-              ? "bg-blue-500 hover:bg-blue-600"
-              : "bg-gray-400 cursor-not-allowed"
-          } text-white p-2 w-[200px] rounded`}
-        >
-          Start Call
-        </button>
-      </div>
-
-      {/* Video Streams */}
-      <div className="flex gap-4">
-        <div className="flex flex-col items-center">
-          <p className="text-white pb-3"> Local Video </p>
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            muted
-            className="h-64 w-64 bg-black"
-          />
-        </div>
-        <div className="flex flex-col items-center">
-          <p className="text-white pb-3"> Remote Video </p>
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            className="h-64 w-64 bg-black"
-          />
-        </div>
-      </div>
-      <div> {/* <Button onClick={handleSignalingData}>Answer</Button> */} </div>
-      <p className="bg-red-300 text-red-950 p-5 mt-5 rounded-md"> {error} </p>
-    </main>
+    <section className="h-screen py-[50px] px-[100px] gap-[30px] flex">
+      <RtcSidebar
+        clientIds={clientIds}
+        startCall={() => startCall(targetId, showToastForClient)}
+        ownId={ownId}
+        connectionStatus={connectionStatus}
+        settargetId={settargetId}
+        showToastForClient={showToastForClient}
+      />
+      <RtcDynamicVideo
+        localVideoRef={localVideoRef}
+        remoteVideoRef={remoteVideoRef}
+        isMediaAccessGranted={isMediaAccessGranted}
+      />
+      <Toaster
+        position="top-right"
+        reverseOrder={false}
+        gutter={8}
+        toastOptions={{
+          style: {
+            background: "#252F3F",
+            color: "#fff",
+            fontFamily: "Roboto, sans-serif",
+          },
+        }}
+      />
+    </section>
   );
 };
 

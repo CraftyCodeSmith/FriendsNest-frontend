@@ -1,37 +1,32 @@
-import { SignalingMessage } from "../interface/SignalingMessage";
+import SockJS from "sockjs-client";
+import Stomp, { Subscription } from "stompjs";
 
-export const sendSignalingData = (
-    stompClientRef: any,
-    data: Partial<SignalingMessage>,
-    setError: any,
-    ownClientId?: string,
-    targetClientId?: string,
+let stompClient: Stomp.Client | null = null;
 
-) => {
-    try {
-        const stompClient = stompClientRef.current;
-        console.log("StompClient", stompClient);
-        console.log("targetClientId", targetClientId);
-        if (stompClient && stompClient.connected) {
-            // Include sender and target in the message
-            const message = {
-                ...data,
-                sender: ownClientId,
-                target: targetClientId,
-            };
+type Signal = {
+  type: string;
+  payload?: any;
+  candidate?: RTCIceCandidateInit;
+};
 
-            stompClient.publish({
-                destination: "/app/call",
-                body: JSON.stringify(message),
-            });
+export const connectWebSocket = (
+  onMessageReceived: (signal: Signal) => void
+): void => {
+  const socket = new SockJS("http://localhost:8080/wc");
+  stompClient = Stomp.over(socket);
 
-            console.log("Sent signaling data:", message);
-        } else {
-            console.error("STOMP client is not connected");
-            setError("STOMP client is not connected");
-        }
-    } catch (error) {
-        console.error("Error sending signaling data:", error);
-        setError("Error sending signaling data");
-    }
+  stompClient.connect({}, (frame: any) => {
+    // Change type to 'any'
+    console.log("Connected: " + frame);
+    stompClient!.subscribe("/topic/messages", (message: { body: string }) => {
+      const signal: Signal = JSON.parse(message.body);
+      onMessageReceived(signal);
+    });
+  });
+};
+
+export const sendSignal = (signal: Signal): void => {
+  if (stompClient && stompClient.connected) {
+    stompClient.send("/app/signal", {}, JSON.stringify(signal));
+  }
 };

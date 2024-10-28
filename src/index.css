@@ -6,6 +6,12 @@
   box-sizing: border-box;
 }
 
+@layer utilities {
+  .list-image-checkmark {
+    list-style-image: theme("listStyleImage.checkmark");
+  }
+}
+
 @layer base {
   @font-face {
     font-family: "RobotoRegular";
@@ -23,7 +29,12 @@
     --font-robotomediumitalic: "RobotoMediumItalic";
   }
 
+  html,
   body {
-    @apply m-0 p-0 min-h-screen w-full bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-slate-900 to-slate-900;
+    @apply h-full;
+  }
+
+  body {
+    @apply m-0 p-0 w-full bg-[#151D2A];
   }
 }
