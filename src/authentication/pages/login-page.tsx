@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 //* component imports
@@ -41,6 +42,8 @@ const LoginPage = () => {
     formState: { errors },
   } = form;
 
+  const navigator = useNavigate();
+
   //* =====> states
   const [showPassword, setShowPassword] = useState(false);
 
@@ -51,6 +54,10 @@ const LoginPage = () => {
 
   const onLoginSubmit = (values: LoginSchema) => {
     console.log("Form Values:", values);
+  };
+
+  const handleNavigateToStreaming = () => {
+    navigator("/streaming");
   };
 
   //* =====> use-effects
@@ -117,6 +124,7 @@ const LoginPage = () => {
           <div className="flex justify-center">
             <Button
               type="submit"
+              onClick={handleNavigateToStreaming}
               className="mt-10 w-full p-5 text-lg bg-slate-900 text-slate-100"
             >
               Log-In

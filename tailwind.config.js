@@ -7,6 +7,7 @@ export default {
       "roboto-r": "var(--font-robotoregular)",
       "roboto-mi": "var(--font-robotomediumitalic)",
     },
+    extend: {},
   },
   plugins: [require("tailwindcss-animate")],
 };

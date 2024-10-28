@@ -1,6 +1,12 @@
+//* package imports
 import { v4 as uuidv4 } from "uuid";
-import React, { useEffect, useRef, useState } from "react";
-import { Client as StompClient, IMessage } from "@stomp/stompjs";
+import toast, { Toaster } from "react-hot-toast";
+
+//* components imports
+import RtcSidebar from "../components/rtc-sidebar";
+import RtcDynamicVideo from "../components/rtc-dynamic-video";
+import { useEffect, useRef, useState } from "react";
+import { Client, IMessage } from "@stomp/stompjs";
 
 interface SignalingMessage {
   type: string;
@@ -11,25 +17,36 @@ interface SignalingMessage {
 }
 
 const StreamingPage: React.FC = () => {
-  // Refs with explicit types
-  const stompClientRef = useRef<StompClient | null>(null);
+  //* ==========> variables
+  let myid: string;
+
+  //* ==========> refs
+  const stompClientRef = useRef<Client | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null!);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null!);
 
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
-
-  // State variables with correct types
-  const [error, setError] = useState<string | null>(null as string | null);
+  //* ==========> states
+  const [error, setError] = useState<string | null>(null);
   const [clientIds, setClientIds] = useState<string[]>([]);
-  const [connectionStatus, setConnectionStatus] =
-    useState<string>("DISCONNECTED");
-
-  // Unique client ID
   const [ownClientId, setOwnClientId] = useState<string>("");
   const [targetClientId, setTargetClientId] = useState<string>("");
+  const [connectionStatus, setConnectionStatus] = useState<boolean>(false);
   const [targetSessionId, setTargetSessionId] = useState<SignalingMessage>();
+  const [isMediaAccessGranted, setIsMediaAccessGranted] =
+    useState<boolean>(false);
+  const [toastTargetClientId, setToastTargetClientId] = useState<string | null>(
+    null
+  );
 
-  let myid: string;
+  //* ==========> use-effects
+  useEffect(() => {
+    if (toastTargetClientId === ownClientId) {
+      toast("Incoming call!", { duration: 5000 });
+    }
+
+    console.log(error);
+  }, [toastTargetClientId, ownClientId]);
 
   useEffect(() => {
     // Generate the clientId
@@ -42,7 +59,7 @@ const StreamingPage: React.FC = () => {
     const websocketUrl = `ws://localhost:8080/video-websocket?clientId=${clientId}`;
 
     // Step 1: Create a STOMP client using native WebSocket with the clientId in the URL
-    const client = new StompClient({
+    const client = new Client({
       brokerURL: websocketUrl, // Include clientId in the WebSocket URL
       reconnectDelay: 5000, // Reconnect every 5 seconds if connection is lost
       heartbeatIncoming: 10000, // Heartbeat interval for incoming messages
@@ -52,7 +69,7 @@ const StreamingPage: React.FC = () => {
       },
 
       onConnect: () => {
-        setConnectionStatus("CONNECTED");
+        setConnectionStatus(true);
         stompClientRef.current = client;
 
         client.subscribe("/topic/client-update", (message) => {
@@ -72,9 +89,7 @@ const StreamingPage: React.FC = () => {
             setTargetSessionId(data);
             console.log("Received signaling data:", data);
             console.log(targetSessionId);
-
-            // Uncomment this line if you have handleSignalingData implemented
-            // handleSignalingData(data);
+            handleSignalingData(data);
           } catch (err) {
             console.error("Error parsing signaling data:", err);
             setError("Error parsing signaling data");
@@ -143,10 +158,12 @@ const StreamingPage: React.FC = () => {
           console.log("Local video stream set");
         }
         stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+        setIsMediaAccessGranted(true);
         console.log("Local tracks added to RTCPeerConnection");
       } catch (mediaError) {
-        console.error("Error accessing media devices.", mediaError);
         setError("Error accessing media devices");
+        setIsMediaAccessGranted(false);
+        console.error("Error accessing media devices.", mediaError);
       }
     };
     makertc();
@@ -160,121 +177,50 @@ const StreamingPage: React.FC = () => {
     };
   }, []);
 
-  // const handleSignalingData = async (data: SignalingMessage) => {
-  //   try {
-  //     const peerConnection = peerConnectionRef.current;
-  //     if (!peerConnection) {
-  //       console.error("PeerConnection is not established");
-  //       setError("PeerConnection is not established");
-  //       return;
-  //     }
+  //* ==========> handle functions
+  const handleSignalingData = async (data: SignalingMessage) => {
+    try {
+      const peerConnection = peerConnectionRef.current;
+      if (!peerConnection) {
+        console.error("PeerConnection is not established");
+        setError("PeerConnection is not established");
+        return;
+      }
 
-  //     console.log("Handling signaling data:", data);
+      switch (data.type) {
+        case "offer":
+          await peerConnection.setRemoteDescription(
+            new RTCSessionDescription(data.sdp!)
+          );
 
-  //     switch (data.type) {
-  //       case "offer":
-  //         await peerConnection.setRemoteDescription(
-  //           new RTCSessionDescription(data.sdp!)
-  //         );
-  //         console.log("Remote offer set");
+          // Set the caller's ID as the target client ID
+          setTargetClientId(data.sender || "");
 
-  //         // Create an answer
-  //         const answer = await peerConnection.createAnswer();
-  //         await peerConnection.setLocalDescription(answer);
-  //         console.log("Answer created and set as local description");
+          // Create and send an answer back to the caller
+          const answer = await peerConnection.createAnswer();
+          await peerConnection.setLocalDescription(answer);
+          sendSignalingData({ type: "answer", sdp: answer }, data.sender || "");
 
-  //         // Send the answer back to the caller
-  //         if (data.sender) {
-  //           sendSignalingData({ type: "answer", sdp: answer }, data.sender);
-  //         } else {
-  //           console.error("Sender ID is missing in the offer");
-  //           setError("Sender ID is missing in the offer");
-  //         }
-  //         break;
+          break;
 
-  //       case "answer":
-  //         await peerConnection.setRemoteDescription(
-  //           new RTCSessionDescription(data.sdp!)
-  //         );
-  //         console.log("Remote answer set");
-  //         break;
+        case "answer":
+          await peerConnection.setRemoteDescription(
+            new RTCSessionDescription(data.sdp!)
+          );
+          break;
 
-  //       case "ice-candidate":
-  //         if (data.candidate) {
-  //           try {
-  //             await peerConnection.addIceCandidate(
-  //               new RTCIceCandidate(data.candidate)
-  //             );
-  //             console.log("ICE candidate added");
-  //           } catch (e) {
-  //             console.error("Error adding received ICE candidate", e);
-  //             setError("Error adding received ICE candidate");
-  //           }
-  //         }
-  //         break;
-
-  //       default:
-  //         console.warn("Unknown signaling data type:", data.type);
-  //         break;
-  //     }
-  //   } catch (error) {
-  //     console.error("Error in handleSignalingData:", error);
-  //     setError("Error in handleSignalingData");
-  //   }
-  // };
-
-  // const sendSignalingData = (
-  //   data: Partial<SignalingMessage>,
-  //   targetClientId: string
-  // ) => {
-  //   try {
-  //     const stompClient = stompClientRef.current;
-  //     if (stompClient && stompClient.connected) {
-  //       // Include sender and target in the message
-  //       const message = {
-  //         ...data,
-  //         sender: ownClientId,
-  //         target: targetClientId,
-  //       };
-
-  //       stompClient.publish({
-  //         destination: "/app/call",
-  //         body: JSON.stringify(message),
-  //       });
-
-  //       console.log("Sent signaling data:", message);
-  //     } else {
-  //       console.error("STOMP client is not connected");
-  //       setError("STOMP client is not connected");
-  //     }
-  //   } catch (error) {
-  //     console.error("Error sending signaling data:", error);
-  //     setError("Error sending signaling data");
-  //   }
-  // };
-
-  // const startCall = async () => {
-  //   try {
-  //     const peerConnection = peerConnectionRef.current;
-  //     if (!peerConnection) {
-  //       console.error("PeerConnection is not established");
-  //       setError("PeerConnection is not established");
-  //       return;
-  //     }
-
-  //     //local description set
-  //     // Create an offer
-  //     const offer = await peerConnection.createOffer();
-  //     await peerConnection.setLocalDescription(offer);
-  //     // console.log("Offer created and set as local description");
-
-  //     // Send the offer to the target client
-  //     sendSignalingData({ type: "offer", sdp: offer }, targetClientId);
-  //   } catch (error) {
-  //     console.error("Error creating or sending offer:", error);
-  //     setError("Error creating or sending offer");
-  //   }
-  // };
+        case "ice-candidate":
+          if (data.candidate) {
+            await peerConnection.addIceCandidate(
+              new RTCIceCandidate(data.candidate)
+            );
+          }
+          break;
+      }
+    } catch (error) {
+      console.error("Error handling signaling data:", error);
+    }
+  };
 
   const sendSignalingData = (
     data: Partial<SignalingMessage>,
@@ -306,7 +252,32 @@ const StreamingPage: React.FC = () => {
     }
   };
 
-  const startCall = async () => {
+  // const startCall = async () => {
+  //   try {
+  //     const peerConnection = peerConnectionRef.current;
+  //     if (!peerConnection) {
+  //       console.error("PeerConnection is not established");
+  //       setError("PeerConnection is not established");
+  //       return;
+  //     }
+
+  //     // Create an offer
+  //     const offer = await peerConnection.createOffer();
+  //     await peerConnection.setLocalDescription(offer);
+  //     console.log("Offer created and set as local description");
+
+  //     // Send the offer to the target client
+  //     sendSignalingData({ type: "offer", sdp: offer }, targetClientId);
+  //   } catch (error) {
+  //     console.error("Error creating or sending offer:", error);
+  //     setError("Error creating or sending offer");
+  //   }
+  // };
+
+  const startCall = async (
+    targetClientId: string,
+    showToastForClient: (id: string) => void
+  ) => {
     try {
       const peerConnection = peerConnectionRef.current;
       if (!peerConnection) {
@@ -322,93 +293,47 @@ const StreamingPage: React.FC = () => {
 
       // Send the offer to the target client
       sendSignalingData({ type: "offer", sdp: offer }, targetClientId);
+
+      // Show toast only for the target client
+      showToastForClient(targetClientId);
     } catch (error) {
       console.error("Error creating or sending offer:", error);
       setError("Error creating or sending offer");
     }
   };
 
+  const showToastForClient = (targetId: string) => {
+    setToastTargetClientId(targetId);
+  };
+
   return (
-    <main className="flex flex-col items-center p-4">
-      <div className="bg-gray-100 p-4 w-[600px] text-center rounded-lg">
-        <h2 className="text-center pb-3">
-          {" "}
-          STATUS:{" "}
-          {connectionStatus === "DISCONNECTED" ? (
-            <span className="text-red-500 font-bold"> {connectionStatus} </span>
-          ) : (
-            <span className="text-green-700 font-bold">
-              {" "}
-              {connectionStatus}{" "}
-            </span>
-          )}
-        </h2>
-        <h3 className="text-lg pb-3">
-          Own Client ID:{" "}
-          <span className="text-md text-green-800 font-semibold">
-            {" "}
-            {ownClientId}{" "}
-          </span>
-        </h3>
-        <h3 className="text-lg">Received Client IDs:</h3>
-        <ul>
-          {clientIds.map((id, index) => (
-            <li key={index} className="text-blue-800 font-bold">
-              {id}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Input to Specify Target Client ID */}
-      <div className="flex items-center pt-5 pb-5 gap-3 w-3/4">
-        <label className="text-slate-100 bg-black p-2 rounded-md w-[140px]">
-          Target ID:
-        </label>
-        <input
-          type="text"
-          value={targetClientId}
-          onChange={(e) => setTargetClientId(e.target.value)}
-          placeholder="Enter Target Client ID"
-          className="w-full p-2 border border-gray-300 rounded"
-        />
-        <button
-          onClick={startCall}
-          disabled={!targetClientId}
-          className={`${
-            targetClientId
-              ? "bg-blue-500 hover:bg-blue-600"
-              : "bg-gray-400 cursor-not-allowed"
-          } text-white p-2 w-[200px] rounded`}
-        >
-          Start Call
-        </button>
-      </div>
-
-      {/* Video Streams */}
-      <div className="flex gap-4">
-        <div className="flex flex-col items-center">
-          <p className="text-white pb-3">Local Video</p>
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            muted
-            className="h-64 w-64 bg-black"
-          />
-        </div>
-        <div className="flex flex-col items-center">
-          <p className="text-white pb-3">Remote Video</p>
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            className="h-64 w-64 bg-black"
-          />
-        </div>
-      </div>
-      <p className="bg-red-300 text-red-950 p-5 mt-5 rounded-md">{error}</p>
-    </main>
+    <section className="h-screen py-[50px] px-[100px] gap-[30px] flex">
+      <RtcSidebar
+        clientIds={clientIds}
+        startCall={() => startCall(targetClientId, showToastForClient)}
+        ownClientId={ownClientId}
+        connectionStatus={connectionStatus}
+        setTargetClientId={setTargetClientId}
+        showToastForClient={showToastForClient}
+      />
+      <RtcDynamicVideo
+        localVideoRef={localVideoRef}
+        remoteVideoRef={remoteVideoRef}
+        isMediaAccessGranted={isMediaAccessGranted}
+      />
+      <Toaster
+        position="top-right"
+        reverseOrder={false}
+        gutter={8}
+        toastOptions={{
+          style: {
+            background: "#252F3F",
+            color: "#fff",
+            fontFamily: "Roboto, sans-serif",
+          },
+        }}
+      />
+    </section>
   );
 };
 
