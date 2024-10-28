@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { FaPlus } from "react-icons/fa";
 import RtcModal from "./rtc-modal";
 
-import { Dispatch, SetStateAction } from "react";
+import { Dispatch, RefObject, SetStateAction } from "react";
 
 interface IRtcSidebarProps {
   ownId: string;
@@ -10,14 +10,14 @@ interface IRtcSidebarProps {
   startCall: () => void;
   connectionStatus: boolean;
   showToastForClient: (targetId: string) => void;
-  settargetId: Dispatch<SetStateAction<string>>;
+  targetId: any;
 }
 
 const RtcSidebar = ({
   ownId,
   clientIds,
   connectionStatus,
-  settargetId,
+  targetId,
   startCall,
 }: IRtcSidebarProps) => {
   //* ==========> handle functions
@@ -64,7 +64,7 @@ const RtcSidebar = ({
               <Dialog>
                 <div
                   className="flex items-center py-1 px-1.5 rounded-md bg-[#24A6AF]"
-                  onClick={() => settargetId(clientId)}
+                  onClick={() => (targetId.current = clientId)}
                 >
                   <DialogTrigger>
                     <FaPlus className="text-[12px] font-extralight text-white" />

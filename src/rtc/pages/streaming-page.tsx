@@ -32,12 +32,12 @@ const StreamingPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [clientIds, setClientIds] = useState<string[]>([]);
   const [ownId, setownId] = useState<string>("");
-  const [targetId, settargetId] = useState<string>("");
+  const targetId = useRef<string | undefined>("");
   let receivedTargetid: string | undefined = "";
+  let receivedSenderId: string | undefined = "";
   let myId: string | undefined = "";
   let target: string | undefined = "";
   const [connectionStatus, setConnectionStatus] = useState<boolean>(false);
-  const [targetSessionId, setTargetSessionId] = useState<SignalingMessage>();
   const [isMediaAccessGranted, setIsMediaAccessGranted] =
     useState<boolean>(false);
   const [toasttargetId, setToasttargetId] = useState<string | null>(null);
@@ -48,15 +48,11 @@ const StreamingPage: React.FC = () => {
         (t: Toast) => (
           <RtcToast
             onConfirm={async () => {
-              // handleConfirmAction();
-              console.log("its confirmed");
-              // acceptOrReject = true;
               const answer = await peerConnectionRef.current!.createAnswer();
               await peerConnectionRef.current!.setLocalDescription(answer);
-              console.log(ownId, targetId);
-
-              if (myId && target)
+              if (myId == receivedTargetid) {
                 sendSignalingData({ type: "answer", sdp: answer });
+              }
 
               toast.dismiss(t.id);
             }}
@@ -72,15 +68,13 @@ const StreamingPage: React.FC = () => {
       );
     }
   };
-  useEffect(() => {
-    target = targetId;
-  }, [targetId]);
+
   //* ==========> use-effects
   useEffect(() => {
     // Generate the clientId
     const clientId = uuidv4();
-    setownId(clientId);
     myId = clientId;
+    setownId(clientId);
 
     // Include the clientId as a query parameter in the WebSocket URL
     const websocketUrl = `ws://192.168.1.15:8080/video-websocket?clientId=${clientId}`;
@@ -113,7 +107,6 @@ const StreamingPage: React.FC = () => {
         client.subscribe(`/user/queue/call`, (message: IMessage) => {
           try {
             const data: SignalingMessage = JSON.parse(message.body);
-            setTargetSessionId(data);
             console.log("Received signaling data:", data);
             handleSignalingData(data);
           } catch (err) {
@@ -142,10 +135,11 @@ const StreamingPage: React.FC = () => {
       const pc = new RTCPeerConnection(configuration);
       peerConnectionRef.current = pc;
       pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
-        if (event.candidate && targetId !== null) {
+        if (event.candidate) {
           console.log("ICE Candidate found:", event.candidate);
           localIceCandidateRef.current = event.candidate;
-          if (ownId && targetId)
+          console.log("1:", target);
+          if (targetId.current)
             sendSignalingData({
               type: "ice-candidate",
               candidate: event.candidate,
@@ -223,13 +217,13 @@ const StreamingPage: React.FC = () => {
         case "offer":
           popup = true;
           receivedTargetid = data.target;
+          receivedSenderId = data.sender;
           console.log("receivedTargetid", receivedTargetid, ownId);
-
+          targetId.current = data.sender;
           showToast();
           await peerConnection.setRemoteDescription(
             new RTCSessionDescription(data.sdp!)
           );
-          settargetId(data.sender || "");
 
           break;
 
@@ -260,8 +254,11 @@ const StreamingPage: React.FC = () => {
         // Include sender and target in the message
         const message = {
           ...data,
-          sender: myId,
-          target: target ? target : targetId,
+          sender: ownId ? ownId : myId,
+          target:
+            targetId?.current?.length! > 0
+              ? targetId.current
+              : receivedSenderId,
         };
 
         stompClient.publish({
@@ -281,7 +278,7 @@ const StreamingPage: React.FC = () => {
   };
 
   const startCall = async (
-    targetId: string,
+    // targetId: any,
     showToastForClient: (id: string) => void
   ) => {
     try {
@@ -299,10 +296,11 @@ const StreamingPage: React.FC = () => {
 
       // Send the offer to the target client
 
-      if (ownId && targetId) sendSignalingData({ type: "offer", sdp: offer });
+      // if (myId && targetId.current)
+      sendSignalingData({ type: "offer", sdp: offer });
 
       // Show toast only for the target client
-      showToastForClient(targetId);
+      showToastForClient(targetId.current!);
     } catch (error) {
       console.error("Error creating or sending offer:", error);
       setError("Error creating or sending offer");
@@ -320,7 +318,7 @@ const StreamingPage: React.FC = () => {
         startCall={() => startCall(targetId, showToastForClient)}
         ownId={ownId}
         connectionStatus={connectionStatus}
-        settargetId={settargetId}
+        targetId={targetId}
         showToastForClient={showToastForClient}
       />
       <RtcDynamicVideo
