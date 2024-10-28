@@ -9,10 +9,9 @@ import {
 interface IRtcModalProps {
   targetClientId: string;
   startCall: () => void;
-  showToast: () => void;
 }
 
-const RtcModal = ({ startCall, showToast, targetClientId }: IRtcModalProps) => {
+const RtcModal = ({ startCall, targetClientId }: IRtcModalProps) => {
   return (
     <>
       <DialogHeader className="relative h-[50px]">
@@ -43,7 +42,7 @@ const RtcModal = ({ startCall, showToast, targetClientId }: IRtcModalProps) => {
             className="h-[40px] w-[123px] text-[16px] bg-[#24A6AF] text-white rounded-3xl hover:bg-[#7ae9f0] hover:text-[#123538] hover:border-[#123538] hover:border duration-200 transition-all ease-linear"
             onClick={() => {
               startCall();
-              showToast();
+              // showToast();
             }}
           >
             Start Call

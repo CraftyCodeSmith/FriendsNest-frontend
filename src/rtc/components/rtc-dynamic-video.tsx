@@ -1,4 +1,4 @@
-import { RefObject } from "react";
+import { RefObject, useEffect } from "react";
 
 interface IRtcDyanmicVideoProps {
   localVideoRef: RefObject<HTMLVideoElement>;
@@ -11,6 +11,13 @@ const RtcDynamicVideo = ({
   remoteVideoRef,
   isMediaAccessGranted,
 }: IRtcDyanmicVideoProps) => {
+  useEffect(() => {
+    console.log(
+      localVideoRef.current,
+      remoteVideoRef.current,
+      "----------------------------yooy"
+    );
+  }, [localVideoRef, remoteVideoRef]);
   return (
     <main className="h-full p-[25px] flex-1 flex flex-col gap-[40px] bg-[#252F3F] rounded-[20px] overflow-hidden">
       {/* Local Video Container */}

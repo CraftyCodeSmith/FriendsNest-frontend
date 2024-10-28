@@ -1,49 +1,31 @@
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { FaPlus } from "react-icons/fa";
 import RtcModal from "./rtc-modal";
-import toast, { Toast } from "react-hot-toast";
-import RtcToast from "./rtc-toast";
+
 import { Dispatch, SetStateAction } from "react";
 
 interface IRtcSidebarProps {
-  ownClientId: string;
+  ownId: string;
   clientIds: string[];
   startCall: () => void;
   connectionStatus: boolean;
   showToastForClient: (targetId: string) => void;
-  setTargetClientId: Dispatch<SetStateAction<string>>;
+  settargetId: Dispatch<SetStateAction<string>>;
 }
 
 const RtcSidebar = ({
-  ownClientId,
+  ownId,
   clientIds,
   connectionStatus,
-  setTargetClientId,
+  settargetId,
   startCall,
-  showToastForClient,
 }: IRtcSidebarProps) => {
   //* ==========> handle functions
-  const handleConfirmAction = () => {
-    console.log("Confirmed!");
-  };
+  // const handleConfirmAction = () => {
+  //   console.log("Confirmed!");
+  // };
 
   //? ==========> handle functions for showing toast notification
-  const showToast = () => {
-    toast.custom(
-      (t: Toast) => (
-        <RtcToast
-          onConfirm={() => {
-            handleConfirmAction();
-            toast.dismiss(t.id);
-          }}
-          onClose={() => toast.dismiss(t.id)}
-        />
-      ),
-      {
-        duration: Infinity,
-      }
-    );
-  };
 
   return (
     <aside className=" h-full w-[268px] gap-[20px] flex flex-col">
@@ -53,7 +35,7 @@ const RtcSidebar = ({
             <p className="text-white text-[18px] font-roboto-r font-medium">
               My Id:
             </p>
-            <p className="text-[#24A6AF] text-[16px] truncate">{ownClientId}</p>
+            <p className="text-[#24A6AF] text-[16px] truncate">{ownId}</p>
           </div>
           {!connectionStatus ? (
             <img src="/src/assets/icons/disconnected.svg" />
@@ -82,7 +64,7 @@ const RtcSidebar = ({
               <Dialog>
                 <div
                   className="flex items-center py-1 px-1.5 rounded-md bg-[#24A6AF]"
-                  onClick={() => setTargetClientId(clientId)}
+                  onClick={() => settargetId(clientId)}
                 >
                   <DialogTrigger>
                     <FaPlus className="text-[12px] font-extralight text-white" />
@@ -92,7 +74,6 @@ const RtcSidebar = ({
                   <RtcModal
                     targetClientId={clientId}
                     startCall={() => startCall()}
-                    showToast={showToast}
                   />
                 </DialogContent>
               </Dialog>
