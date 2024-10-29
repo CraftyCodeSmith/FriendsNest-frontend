@@ -1,26 +1,25 @@
 import { SignalingMessage } from "@/rtc/interface/SignalingMessage";
 import { handleSignalingData } from "@/rtc/service/handleSignalingData";
-import { sendSignalingData } from "@/rtc/service/signaling";
+import { sendSignalingData } from "@/rtc/service/sendSignalingData";
 import { Client } from "@stomp/stompjs";
 import { useRef } from "react";
 
-interface IPeerConnection {
-    setError: any;
-    // sendSignalingData: (
-    //     stompClientRef: Client | null,
-    //     data: Partial<SignalingMessage>,
-    //     setError: any,
-    //     ownClientId?: string,
-    //     targetClientId?: string,) => void,
-    stompClientRef: Client | null,
-    ownClientId: string,
-    targetClientId: string,
+// interface IPeerConnection {
+//     setError: any;
+//     // sendSignalingData: (
+//     //     stompClientRef: Client | null,
+//     //     data: Partial<SignalingMessage>,
+//     //     setError: any,
+//     //     ownClientId?: string,
+//     //     targetClientId?: string,) => void,
+//     stompClientRef,
+//     ownClientId: string,
+//     targetClientId: string,
 
-}
+// }
 
-export const usePeerConnection: any = ({ setError,
-    // sendSignalingData,
-    stompClientRef, ownClientId, targetClientId }: IPeerConnection) => {
+export const usePeerConnection: any = (setError: any,
+    stompClientRef: any, ownClientId: any, targetClientId: any) => {
     const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
     const localVideoRef = useRef<HTMLVideoElement | null>(null);
     const remoteVideoRef = useRef<HTMLVideoElement | null>(null);

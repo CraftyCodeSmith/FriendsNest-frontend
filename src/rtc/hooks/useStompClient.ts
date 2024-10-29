@@ -1,51 +1,59 @@
-// import { useState, useEffect, useCallback } from "react";
-// import { Client } from "@stomp/stompjs";
+import { Client, IMessage } from "@stomp/stompjs";
+import { IStreamingPageProps } from "../interface/StreamingPage";
+import { v4 as uuidv4 } from "uuid";
+import { SignalingMessage } from "../interface/SignalingMessage";
+import { handleSignalingData } from "../service/handleSignalingData";
+export const useStompClient = (streamingPageProps: IStreamingPageProps, setownId: any, setConnectionStatus: any, setClientIds: any, stompClientRef: any, peerConnectionRef: any, targetId: any, ownId: string) => {
+    const clientId = uuidv4();
+    streamingPageProps.myId = clientId;
+    setownId(clientId);
 
-// export const useStompClient = () => {
-//   const [client, setClient] = useState(null);
-//   const [isConnected, setIsConnected] = useState(false);
+    // Include the clientId as a query parameter in the WebSocket URL
+    const websocketUrl = `ws://192.168.1.15:8080/video-websocket?clientId=${clientId}`;
 
-//   useEffect(() => {
-//     const stompClient = new Client({
-//       brokerURL: "ws://localhost:8080/video-websocket?clientId=${clientId}",
-//       reconnectDelay: 5000,
-//       onConnect: () => {
-//         setIsConnected(true);
-//         stompClient.subscribe("/topic/client-update", (message) => {
-//           // Handle client update messages
-//           const data = JSON.parse(message.body);
-//           console.log("Client Update:", data);
-//           // Add any client update handling logic here
-//         });
-//         stompClient.subscribe("/user/queue/call", (message) => {
-//           // Handle incoming call messages
-//           const data = JSON.parse(message.body);
-//           console.log("Incoming Call:", data);
-//           // Add incoming call handling logic here
-//         });
-//       },
-//       onDisconnect: () => setIsConnected(false),
-//     });
+    // Step 1: Create a STOMP client using native WebSocket with the clientId in the URL
+    const client = new Client({
+        brokerURL: websocketUrl, // Include clientId in the WebSocket URL
+        reconnectDelay: 5000, // Reconnect every 5 seconds if connection is lost
+        heartbeatIncoming: 10000, // Heartbeat interval for incoming messages
+        heartbeatOutgoing: 10000, // Heartbeat interval for outgoing messages
+        debug: (str) => {
+            // console.log("STOMP:", str);
+        },
 
-//     stompClient.activate();
-//     setClient(stompClient);
+        onConnect: () => {
+            setConnectionStatus(true);
+            stompClientRef.current = client;
 
-//     return () => {
-//       stompClient.deactivate();
-//     };
-//   }, []);
+            client.subscribe("/topic/client-update", (message) => {
+                const updatedSessionMap = JSON.parse(message.body);
+                // console.log("Received updated session map:", updatedSessionMap);
 
-//   const sendSignalingData = useCallback(
-//     (destination, data) => {
-//       if (client && isConnected) {
-//         client.publish({
-//           destination,
-//           body: JSON.stringify(data),
-//         });
-//       }
-//     },
-//     [client, isConnected]
-//   );
+                const ids = Object.keys(updatedSessionMap).filter(
+                    (id) => id !== streamingPageProps.myId
+                );
+                setClientIds(ids);
+            });
 
-//   return { sendSignalingData, isConnected };
-// };
+            // Subscribe to receive messages intended for this client
+            client.subscribe(`/user/queue/call`, (message: IMessage) => {
+                try {
+                    const data: SignalingMessage = JSON.parse(message.body);
+                    console.log("Received signaling data:", data);
+                    handleSignalingData(data, peerConnectionRef, streamingPageProps, targetId, ownId, stompClientRef);
+                } catch (err) {
+                    console.error("Error parsing signaling data:", err);
+                    // setError("Error parsing signaling data");
+                }
+            });
+
+            // Send a connect message to the server (Optional if handled during handshake)
+            client.publish({
+                destination: "/app/connect",
+                body: JSON.stringify({ sender: clientId }),
+            });
+        },
+    });
+
+    return [client]
+}
