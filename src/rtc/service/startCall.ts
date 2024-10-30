@@ -2,7 +2,7 @@ import { IStreamingPageProps } from "../interface/StreamingPage";
 import { sendSignalingData } from "./sendSignalingData";
 import { showToastForClient } from "./showToast";
 
-export const startCall = async (peerConnectionRef: any, streamingPageProps: IStreamingPageProps, ownId: string, targetId: any, stompClientRef: any, setToasttargetId: any) => {
+export const startCall = async (peerConnectionRef: any, streamingPageProps: IStreamingPageProps, targetId: any, stompClientRef: any, setToasttargetId: any) => {
     try {
         const peerConnection = peerConnectionRef.current;
         if (!peerConnection) {
@@ -19,7 +19,7 @@ export const startCall = async (peerConnectionRef: any, streamingPageProps: IStr
         // Send the offer to the target client
 
         // if (myId && targetId.current)
-        sendSignalingData({ type: "offer", sdp: offer }, stompClientRef, streamingPageProps, ownId, targetId);
+        sendSignalingData({ type: "offer", sdp: offer }, stompClientRef, streamingPageProps, targetId);
 
         // Show toast only for the target client
         showToastForClient(targetId.current!, setToasttargetId);

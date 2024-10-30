@@ -2,7 +2,11 @@ import { SignalingMessage } from "../interface/SignalingMessage";
 import { IStreamingPageProps } from "../interface/StreamingPage";
 import { showToast } from "./showToast";
 
-export const handleSignalingData = async (data: SignalingMessage, peerConnectionRef: any, streamingPageProps: IStreamingPageProps, targetId: any, ownId: string, stompClientRef: any) => {
+export const handleSignalingData = async (data: SignalingMessage,
+    peerConnectionRef: any,
+    streamingPageProps: IStreamingPageProps,
+    targetId: any,
+    stompClientRef: any) => {
     try {
         const peerConnection = peerConnectionRef.current;
         // if (!peerConnection) {
@@ -19,7 +23,6 @@ export const handleSignalingData = async (data: SignalingMessage, peerConnection
                 targetId.current = data.sender;
                 showToast(peerConnectionRef,
                     streamingPageProps,
-                    ownId,
                     targetId,
                     stompClientRef);
                 await peerConnection.setRemoteDescription(

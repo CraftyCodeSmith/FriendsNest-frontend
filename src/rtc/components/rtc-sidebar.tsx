@@ -2,29 +2,27 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { FaPlus } from "react-icons/fa";
 import RtcModal from "./rtc-modal";
 
-import { Dispatch, RefObject, SetStateAction } from "react";
+import { useEffect, useState } from "react";
+import { IStreamingPageProps } from "../interface/StreamingPage";
 
 interface IRtcSidebarProps {
-  ownId: string;
-  clientIds: string[];
   startCall: () => void;
-  connectionStatus: boolean;
   showToastForClient: (targetId: string) => void;
   targetId: any;
+  streamingPageProps: IStreamingPageProps;
+  ids: string[] | [];
 }
 
 const RtcSidebar = ({
-  ownId,
-  clientIds,
-  connectionStatus,
   targetId,
   startCall,
+  streamingPageProps,
+  ids,
 }: IRtcSidebarProps) => {
   //* ==========> handle functions
-  // const handleConfirmAction = () => {
-  //   console.log("Confirmed!");
-  // };
-
+  useEffect(() => {
+    console.log(ids);
+  }, [ids]);
   //? ==========> handle functions for showing toast notification
 
   return (
@@ -35,9 +33,11 @@ const RtcSidebar = ({
             <p className="text-white text-[18px] font-roboto-r font-medium">
               My Id:
             </p>
-            <p className="text-[#24A6AF] text-[16px] truncate">{ownId}</p>
+            <p className="text-[#24A6AF] text-[16px] truncate">
+              {streamingPageProps.myId}
+            </p>
           </div>
-          {!connectionStatus ? (
+          {!streamingPageProps.connectionStatus ? (
             <img src="/src/assets/icons/disconnected.svg" />
           ) : (
             <img src="/src/assets/icons/connected.svg" />
@@ -50,7 +50,7 @@ const RtcSidebar = ({
         </p>
         <p className="mt-3.5 border border-[#384458]" />
         <ul className="mt-3.5 text-white">
-          {clientIds.map((clientId) => (
+          {ids?.map((clientId) => (
             <div
               key={clientId}
               className="flex justify-between pb-3 gap-[20px]"

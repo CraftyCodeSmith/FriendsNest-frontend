@@ -6,7 +6,6 @@ import { sendSignalingData } from "./sendSignalingData";
 export const showToast = async (
   peerConnectionRef: any,
   streamingPageProps: IStreamingPageProps,
-  ownId: string,
   targetId: any,
   stompClientRef: any
 ) => {
@@ -27,7 +26,6 @@ export const showToast = async (
                 { type: "answer", sdp: answer },
                 streamingPageProps,
                 stompClientRef,
-                ownId,
                 targetId
               );
             }

@@ -1,6 +1,6 @@
 import { sendSignalingData } from "./sendSignalingData";
 
-export const makertc = async (peerConnectionRef: any, localIceCandidateRef: any, localVideoRef: any, remoteVideoRef: any, targetId: any, target: any, setIsMediaAccessGranted: any, stompClientRef: any, streamingPageProps: any, ownId: string) => {
+export const makertc = async (peerConnectionRef: any, localIceCandidateRef: any, localVideoRef: any, remoteVideoRef: any, targetId: any, setIsMediaAccessGranted: any, stompClientRef: any, streamingPageProps: any) => {
     const configuration: RTCConfiguration = {
         iceServers: [
             { urls: "stun:stun.l.google.com:19302" },
@@ -15,12 +15,11 @@ export const makertc = async (peerConnectionRef: any, localIceCandidateRef: any,
         if (event.candidate) {
             console.log("ICE Candidate found:", event.candidate);
             localIceCandidateRef.current = event.candidate;
-            console.log("1:", target);
             if (targetId.current)
                 sendSignalingData({
                     type: "ice-candidate",
                     candidate: event.candidate,
-                }, stompClientRef, streamingPageProps, ownId, targetId);
+                }, stompClientRef, streamingPageProps, targetId);
         }
     };
 
