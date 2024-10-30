@@ -24,8 +24,8 @@ const StreamingPage: React.FC = () => {
   const localIceCandidateRef = useRef<any>(null);
   const targetId = useRef<string | undefined>("");
   const stompClientRef = useRef<Client | null>(null);
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null!);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null!);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
 
   //* ==========> states
@@ -47,7 +47,8 @@ const StreamingPage: React.FC = () => {
         stompClientRef,
         setIds
       );
-
+    } // return () => {
+    if (localIceCandidateRef.current == null)
       makertc(
         peerConnectionRef,
         localIceCandidateRef,
@@ -58,7 +59,6 @@ const StreamingPage: React.FC = () => {
         stompClientRef,
         streamingPageProps
       );
-    } // return () => {
     //   if (client) {
     //     client.deactivate();
     //     console.log("WebSocket connection closed");

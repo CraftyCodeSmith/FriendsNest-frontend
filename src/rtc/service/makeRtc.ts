@@ -4,8 +4,8 @@ import { sendSignalingData } from "./sendSignalingData";
 export const makertc = async (
     peerConnectionRef: React.MutableRefObject<RTCPeerConnection | null>,
     localIceCandidateRef: React.MutableRefObject<RTCIceCandidate | null>,
-    localVideoRef: React.MutableRefObject<HTMLVideoElement | null>,
-    remoteVideoRef: React.MutableRefObject<HTMLVideoElement | null>,
+    localVideoRef: React.MutableRefObject<HTMLVideoElement>,
+    remoteVideoRef: React.MutableRefObject<HTMLVideoElement>,
     targetId: React.MutableRefObject<string | undefined>,
     setIsMediaAccessGranted: React.Dispatch<React.SetStateAction<boolean>>,
     stompClientRef: React.MutableRefObject<any>, // Specify a more precise type if possible
@@ -20,6 +20,7 @@ export const makertc = async (
 
     const pc = new RTCPeerConnection(configuration);
     peerConnectionRef.current = pc;
+    setLocalUserMedia(localVideoRef, setIsMediaAccessGranted, pc);
 
     pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
         if (event.candidate) {
@@ -39,18 +40,27 @@ export const makertc = async (
 
     pc.ontrack = (event: RTCTrackEvent) => {
         console.log("Remote track received:", event);
+        console.log("Remote video stream set", remoteVideoRef.current);
 
-        if (remoteVideoRef.current!.srcObject && event.streams.length > 0) {
-            remoteVideoRef.current!.srcObject = event.streams[0];
+        if (event.streams.length > 0) {
+            remoteVideoRef.current.srcObject = event.streams[0];
             console.log(
                 "Remote video stream set",
-                remoteVideoRef.current!.srcObject,
+                remoteVideoRef.current.srcObject,
                 event.streams
             );
         }
     };
 
     // Get user media
+
+};
+
+export const setLocalUserMedia = async (localVideoRef: React.MutableRefObject<HTMLVideoElement>,
+    setIsMediaAccessGranted: React.Dispatch<React.SetStateAction<boolean>>,
+    pc: RTCPeerConnection
+
+) => {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             video: true,
@@ -72,4 +82,4 @@ export const makertc = async (
         setIsMediaAccessGranted(false);
         console.error("Error accessing media devices.", mediaError);
     }
-};
+}
