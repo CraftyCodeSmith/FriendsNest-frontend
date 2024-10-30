@@ -1,6 +1,16 @@
+import { IStreamingPageProps } from "../interface/StreamingPage";
 import { sendSignalingData } from "./sendSignalingData";
 
-export const makertc = async (peerConnectionRef: any, localIceCandidateRef: any, localVideoRef: any, remoteVideoRef: any, targetId: any, setIsMediaAccessGranted: any, stompClientRef: any, streamingPageProps: any) => {
+export const makertc = async (
+    peerConnectionRef: React.MutableRefObject<RTCPeerConnection | null>,
+    localIceCandidateRef: React.MutableRefObject<RTCIceCandidate | null>,
+    localVideoRef: React.MutableRefObject<HTMLVideoElement | null>,
+    remoteVideoRef: React.MutableRefObject<HTMLVideoElement | null>,
+    targetId: React.MutableRefObject<string | undefined>,
+    setIsMediaAccessGranted: React.Dispatch<React.SetStateAction<boolean>>,
+    stompClientRef: React.MutableRefObject<any>, // Specify a more precise type if possible
+    streamingPageProps: IStreamingPageProps // Use the defined interface
+) => {
     const configuration: RTCConfiguration = {
         iceServers: [
             { urls: "stun:stun.l.google.com:19302" },
@@ -30,8 +40,8 @@ export const makertc = async (peerConnectionRef: any, localIceCandidateRef: any,
     pc.ontrack = (event: RTCTrackEvent) => {
         console.log("Remote track received:", event);
 
-        if (!remoteVideoRef.current.srcObject && event.streams.length > 0) {
-            remoteVideoRef.current.srcObject = event.streams[0];
+        if (remoteVideoRef.current!.srcObject && event.streams.length > 0) {
+            remoteVideoRef.current!.srcObject = event.streams[0];
             console.log(
                 "Remote video stream set",
                 remoteVideoRef.current!.srcObject,
@@ -46,7 +56,7 @@ export const makertc = async (peerConnectionRef: any, localIceCandidateRef: any,
             video: true,
             audio: true,
         });
-        console.log("User media obtained");
+        console.log("User media obtained", localVideoRef);
         if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
             console.log(

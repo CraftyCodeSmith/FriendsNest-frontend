@@ -24,8 +24,8 @@ const StreamingPage: React.FC = () => {
   const localIceCandidateRef = useRef<any>(null);
   const targetId = useRef<string | undefined>("");
   const stompClientRef = useRef<Client | null>(null);
-  const localVideoRef = useRef<HTMLVideoElement>(null!);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null!);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
 
   //* ==========> states

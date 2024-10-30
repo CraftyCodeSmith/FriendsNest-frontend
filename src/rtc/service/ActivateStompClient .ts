@@ -3,19 +3,20 @@ import { handleSignalingData } from "@/rtc/service/handleSignalingData";
 import { IMessage, Client as StompClient } from "@stomp/stompjs";
 import React, { useState } from "react";
 import { v4 as uuidv4 } from "uuid";
+import { IStreamingPageProps } from "../interface/StreamingPage";
 // import { handleSignalingData } from "@/rtc/service/handleSignalingData";
 export const ActivateStompClient: any = (
-    peerConnectionRef: any,
-    setError: any,
-    streamingPageProps: any,
-    targetId: any,
+    peerConnectionRef: React.MutableRefObject<RTCPeerConnection | null>,
+    setError: React.Dispatch<React.SetStateAction<string>>,
+    streamingPageProps: IStreamingPageProps,
+    targetId: React.MutableRefObject<string | undefined>,
     stompClientRef: React.MutableRefObject<any>,
     setIds: React.Dispatch<React.SetStateAction<string[]>>
 ) => {
 
     const clientId = uuidv4();
     streamingPageProps.myId = clientId;
-    const websocketUrl = `ws://localhost:8080/video-websocket?clientId=${clientId}`;
+    const websocketUrl = `ws://192.168.1.37:8080/video-websocket?clientId=${clientId}`;
     const client = new StompClient({
         brokerURL: websocketUrl, // Include clientId in the WebSocket URL
         reconnectDelay: 5000, // Reconnect every 5 seconds if connection is lost

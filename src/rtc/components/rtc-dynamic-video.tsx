@@ -1,8 +1,8 @@
 import { RefObject, useEffect } from "react";
 
 interface IRtcDyanmicVideoProps {
-  localVideoRef: RefObject<HTMLVideoElement>;
-  remoteVideoRef: RefObject<HTMLVideoElement>;
+  localVideoRef: React.MutableRefObject<HTMLVideoElement | null>;
+  remoteVideoRef: React.MutableRefObject<HTMLVideoElement | null>;
   isMediaAccessGranted: boolean;
 }
 
