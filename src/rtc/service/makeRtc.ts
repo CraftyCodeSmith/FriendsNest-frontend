@@ -20,7 +20,9 @@ export const makertc = async (
 
     const pc = new RTCPeerConnection(configuration);
     peerConnectionRef.current = pc;
+
     setLocalUserMedia(localVideoRef, setIsMediaAccessGranted, pc);
+    setRemoteMedia(pc, remoteVideoRef);
 
     pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
         if (event.candidate) {
@@ -38,25 +40,27 @@ export const makertc = async (
         console.log("ICE Gathering State:", pc.iceGatheringState);
     };
 
-    pc.ontrack = (event: RTCTrackEvent) => {
-        console.log("Remote track received:", event);
-        console.log("Remote video stream set", remoteVideoRef.current);
-
-        if (event.streams.length > 0) {
-            remoteVideoRef.current.srcObject = event.streams[0];
-            console.log(
-                "Remote video stream set",
-                remoteVideoRef.current.srcObject,
-                event.streams
-            );
-        }
-    };
-
-    // Get user media
-
 };
 
-export const setLocalUserMedia = async (localVideoRef: React.MutableRefObject<HTMLVideoElement>,
+const setRemoteMedia = (pc: RTCPeerConnection, remoteVideoRef: React.MutableRefObject<HTMLVideoElement>,) => {
+    pc.ontrack = (event: RTCTrackEvent) => {
+        console.log("Remote track received:", event);
+        try {
+            if (event.streams.length > 0) {
+                remoteVideoRef.current.srcObject = event.streams[0];
+                console.log(
+                    "Remote video stream set",
+                    remoteVideoRef.current.srcObject,
+                    event.streams
+                );
+            }
+        }
+        catch (error) {
+            console.log(error)
+        }
+    };
+}
+const setLocalUserMedia = async (localVideoRef: React.MutableRefObject<HTMLVideoElement>,
     setIsMediaAccessGranted: React.Dispatch<React.SetStateAction<boolean>>,
     pc: RTCPeerConnection
 
