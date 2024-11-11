@@ -1,44 +1,32 @@
-//* package imports
-import { Toaster } from "react-hot-toast";
-
-//* components imports
 import { Client } from "@stomp/stompjs";
 import { useEffect, useRef, useState } from "react";
+import { Toaster } from "react-hot-toast";
 import RtcDynamicVideo from "../components/rtc-dynamic-video";
 import RtcSidebar from "../components/rtc-sidebar";
 import { streamingPageProps } from "../interface/StreamingPage";
 import { ActivateStompClient } from "../service/ActivateStompClient ";
 import { makertc } from "../service/makeRtc";
-import { showToast } from "../service/showToast";
 import { startCall } from "../service/startCall";
-interface SignalingMessage {
-  type: string;
-  sdp?: RTCSessionDescriptionInit;
-  candidate?: RTCIceCandidateInit;
-  sender?: string; // Now string
-  target?: string; // Now string
-}
 
 const StreamingPage: React.FC = () => {
-  //* ==========> refs
-  const localIceCandidateRef = useRef<any>(null);
+  //* ===========> Refs
+  const localIceCandidateRef = useRef<RTCIceCandidate | null>(null);
   const targetId = useRef<string | undefined>("");
   const stompClientRef = useRef<Client | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null!);
   const remoteVideoRef = useRef<HTMLVideoElement>(null!);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
 
-  //* ==========> states
+  //* ===========> States
   const [error, setError] = useState<string | null>(null);
-  const [toasttargetId, setToasttargetId] = useState<string | null>(null);
+  const [toastTargetId, setToastTargetId] = useState<string | null>(null);
   const [isMediaAccessGranted, setIsMediaAccessGranted] =
     useState<boolean>(false);
   const [ids, setIds] = useState<string[]>([]);
 
-  //* ==========> use-effects
-  showToast(peerConnectionRef, streamingPageProps, targetId, stompClientRef);
+  //* ===========> Effects
   useEffect(() => {
-    if (streamingPageProps.myId == "") {
+    if (streamingPageProps.myId === "") {
       ActivateStompClient(
         peerConnectionRef,
         setError,
@@ -47,8 +35,9 @@ const StreamingPage: React.FC = () => {
         stompClientRef,
         setIds
       );
-    } // return () => {
-    if (localIceCandidateRef.current == null)
+    }
+
+    if (localIceCandidateRef.current == null) {
       makertc(
         peerConnectionRef,
         localIceCandidateRef,
@@ -59,30 +48,45 @@ const StreamingPage: React.FC = () => {
         stompClientRef,
         streamingPageProps
       );
-    //   if (client) {
-    //     client.deactivate();
-    //     console.log("WebSocket connection closed");
+    }
+
+    // return () => {
+    //   // Cleanup on component unmount
+    //   if (stompClientRef.current) {
+    //     stompClientRef.current.deactivate();
+    //     console.log("STOMP connection closed");
+    //   }
+    //   if (peerConnectionRef.current) {
+    //     peerConnectionRef.current.close();
+    //     console.log("RTC connection closed");
     //   }
     // };
   }, []);
 
   const showToastForClient = (targetId: string) => {
-    setToasttargetId(targetId);
+    setToastTargetId(targetId);
   };
 
   return (
     <section className="h-screen py-[50px] px-[100px] gap-[30px] flex">
       <RtcSidebar
         streamingPageProps={streamingPageProps}
-        startCall={() =>
-          startCall(
-            peerConnectionRef,
-            streamingPageProps,
-            targetId,
-            stompClientRef,
-            setToasttargetId
+        startCall={() => {
+          if (
+            !streamingPageProps.makeCall &&
+            !(
+              peerConnectionRef.current &&
+              peerConnectionRef.current.iceConnectionState === "connected"
+            )
           )
-        }
+            startCall(
+              peerConnectionRef,
+              streamingPageProps,
+              targetId,
+              stompClientRef,
+              setToastTargetId
+            );
+        }}
         targetId={targetId}
         showToastForClient={showToastForClient}
         ids={ids}

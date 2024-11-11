@@ -6,6 +6,7 @@ export interface IStreamingPageProps {
     receivedSenderId: string | undefined;
     receivedTargetid: string | undefined;
     connectionStatus: boolean;
+    makeCall: boolean;
 }
 
 
@@ -16,6 +17,6 @@ export const streamingPageProps: IStreamingPageProps = {
     acceptOrReject: false,
     receivedSenderId: "",
     receivedTargetid: "",
-    connectionStatus: false
-
+    connectionStatus: false,
+    makeCall: false,
 };

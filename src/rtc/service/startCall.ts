@@ -4,6 +4,7 @@ import { showToastForClient } from "./showToast";
 
 export const startCall = async (peerConnectionRef: any, streamingPageProps: IStreamingPageProps, targetId: any, stompClientRef: any, setToasttargetId: any) => {
     try {
+        streamingPageProps.makeCall = true;
         const peerConnection = peerConnectionRef.current;
         if (!peerConnection) {
             console.error("PeerConnection is not established");

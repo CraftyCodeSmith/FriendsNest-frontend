@@ -2,7 +2,6 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { FaPlus } from "react-icons/fa";
 import RtcModal from "./rtc-modal";
 
-import { useEffect, useState } from "react";
 import { IStreamingPageProps } from "../interface/StreamingPage";
 
 interface IRtcSidebarProps {
@@ -19,10 +18,6 @@ const RtcSidebar = ({
   streamingPageProps,
   ids,
 }: IRtcSidebarProps) => {
-  //* ==========> handle functions
-  useEffect(() => {
-    console.log(ids);
-  }, [ids]);
   //? ==========> handle functions for showing toast notification
 
   return (

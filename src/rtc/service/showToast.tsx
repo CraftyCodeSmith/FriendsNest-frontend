@@ -24,8 +24,8 @@ export const showToast = async (
             ) {
               sendSignalingData(
                 { type: "answer", sdp: answer },
-                streamingPageProps,
                 stompClientRef,
+                streamingPageProps,
                 targetId
               );
             }

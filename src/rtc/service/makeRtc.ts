@@ -8,14 +8,11 @@ export const makertc = async (
     remoteVideoRef: React.MutableRefObject<HTMLVideoElement>,
     targetId: React.MutableRefObject<string | undefined>,
     setIsMediaAccessGranted: React.Dispatch<React.SetStateAction<boolean>>,
-    stompClientRef: React.MutableRefObject<any>, // Specify a more precise type if possible
-    streamingPageProps: IStreamingPageProps // Use the defined interface
+    stompClientRef: React.MutableRefObject<any>,
+    streamingPageProps: IStreamingPageProps
 ) => {
     const configuration: RTCConfiguration = {
-        iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            // Add TURN servers here if needed
-        ],
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     };
 
     const pc = new RTCPeerConnection(configuration);
@@ -26,7 +23,6 @@ export const makertc = async (
 
     pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
         if (event.candidate) {
-            console.log("ICE Candidate found:", event.candidate);
             localIceCandidateRef.current = event.candidate;
             if (targetId.current)
                 sendSignalingData({
@@ -39,51 +35,26 @@ export const makertc = async (
     pc.onicegatheringstatechange = () => {
         console.log("ICE Gathering State:", pc.iceGatheringState);
     };
-
 };
 
-const setRemoteMedia = (pc: RTCPeerConnection, remoteVideoRef: React.MutableRefObject<HTMLVideoElement>,) => {
+const setRemoteMedia = (pc: RTCPeerConnection, remoteVideoRef: React.MutableRefObject<HTMLVideoElement>) => {
     pc.ontrack = (event: RTCTrackEvent) => {
-        console.log("Remote track received:", event);
-        try {
-            if (event.streams.length > 0) {
-                remoteVideoRef.current.srcObject = event.streams[0];
-                console.log(
-                    "Remote video stream set",
-                    remoteVideoRef.current.srcObject,
-                    event.streams
-                );
-            }
-        }
-        catch (error) {
-            console.log(error)
+        if (event.streams.length > 0) {
+            remoteVideoRef.current.srcObject = event.streams[0];
         }
     };
-}
-const setLocalUserMedia = async (localVideoRef: React.MutableRefObject<HTMLVideoElement>,
-    setIsMediaAccessGranted: React.Dispatch<React.SetStateAction<boolean>>,
-    pc: RTCPeerConnection
+};
 
-) => {
+const setLocalUserMedia = async (localVideoRef: React.MutableRefObject<HTMLVideoElement>, setIsMediaAccessGranted: React.Dispatch<React.SetStateAction<boolean>>, pc: RTCPeerConnection) => {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true,
-        });
-        console.log("User media obtained", localVideoRef);
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
-            console.log(
-                "Local video stream set",
-                localVideoRef.current.srcObject
-            );
         }
         stream.getTracks().forEach((track) => pc.addTrack(track, stream));
         setIsMediaAccessGranted(true);
-        console.log("Local tracks added to RTCPeerConnection");
     } catch (mediaError) {
-        //   setError("Error accessing media devices");
         setIsMediaAccessGranted(false);
         console.error("Error accessing media devices.", mediaError);
     }
-}
+};

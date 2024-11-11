@@ -17,10 +17,12 @@ export const handleSignalingData = async (data: SignalingMessage,
 
         switch (data.type) {
             case "offer":
+
                 streamingPageProps.popup = true;
                 streamingPageProps.receivedTargetid = data.target;
                 streamingPageProps.receivedSenderId = data.sender;
                 targetId.current = data.sender;
+
                 showToast(peerConnectionRef,
                     streamingPageProps,
                     targetId,
