@@ -8,7 +8,7 @@
 
 @layer utilities {
   .list-image-checkmark {
-    list-style-image: theme("listStyleImage.checkmark");
+    /* list-style-image: theme("listStyleImage.checkmark"); */
   }
 }
 

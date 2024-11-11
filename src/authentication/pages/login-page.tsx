@@ -1,16 +1,13 @@
 //* package imports
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
+import { z } from "zod";
 
 //* component imports
-import { FaEye } from "react-icons/fa";
-import { FaEyeSlash } from "react-icons/fa";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import CardWrapper from "@/components/common/card-wrapper";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -18,9 +15,12 @@ import {
   FormItem,
   FormLabel,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 //* file imports
 import { LoginFormSchema } from "@/schema/form-schema";
+import { useLoginMutation } from "../services/authApi"; // Add your login mutation hook
 
 type LoginSchema = z.infer<typeof LoginFormSchema>;
 
@@ -46,14 +46,31 @@ const LoginPage = () => {
 
   //* =====> states
   const [showPassword, setShowPassword] = useState(false);
+  const [login, { isLoading, isError }] = useLoginMutation(); // Initialize the login mutation
 
   //* =====> handle functions
   const handleShowPassword = () => {
     setShowPassword(!showPassword);
   };
 
-  const onLoginSubmit = (values: LoginSchema) => {
-    console.log("Form Values:", values);
+  const onLoginSubmit = async (values: LoginSchema) => {
+    const loginPayload = {
+      email: values.email,
+      password: values.password,
+    };
+
+    try {
+      // Trigger the login mutation and await the response
+      const response = await login(loginPayload).unwrap();
+      if (response.token && typeof response.token === "string") {
+        sessionStorage.setItem("authToken", response.token);
+        navigator("/streaming");
+      }
+      // Navigate to streaming page or perform other actions on success
+    } catch (error) {
+      console.error("Login failed:", error);
+      // Handle error (e.g., show error message)
+    }
   };
 
   const handleNavigateToStreaming = () => {
@@ -75,7 +92,7 @@ const LoginPage = () => {
       backButtonVariant={"link"}
     >
       <Form {...form}>
-        <form onChange={handleSubmit(onLoginSubmit)}>
+        <form onSubmit={handleSubmit(onLoginSubmit)}>
           <FormField
             control={control}
             name="email"
@@ -124,10 +141,9 @@ const LoginPage = () => {
           <div className="flex justify-center">
             <Button
               type="submit"
-              onClick={handleNavigateToStreaming}
               className="mt-10 w-full p-5 text-lg bg-slate-900 text-slate-100"
             >
-              Log-In
+              {isLoading ? "Logging in..." : "Log-In"}
             </Button>
           </div>
         </form>
