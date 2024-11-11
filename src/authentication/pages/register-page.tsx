@@ -23,6 +23,7 @@ import { RegisterFormSchema } from "@/schema/form-schema";
 
 // Import the `useRegisterMutation` hook from RTK Query
 import { useRegisterMutation } from "../services/authApi";
+import { useNavigate } from "react-router-dom";
 
 type RegisterSchema = z.infer<typeof RegisterFormSchema>;
 
@@ -47,7 +48,7 @@ const RegisterPage = () => {
       // status: true, // Default to true (can be changed based on form input if needed)
     },
   });
-
+  const navigator = useNavigate();
   const {
     control,
     handleSubmit,
@@ -63,7 +64,7 @@ const RegisterPage = () => {
   };
 
   // Use the `useRegisterMutation` hook from RTK Query
-  const [register, { isLoading, error }] = useRegisterMutation();
+  const [register, { isLoading, isError }] = useRegisterMutation();
 
   const onRegisterSubmit = async (values: RegisterSchema) => {
     // Log the form values for debugging
@@ -79,6 +80,9 @@ const RegisterPage = () => {
 
       // Attempt to register the user with the payload
       await register(payload).unwrap(); // Use unwrap to throw an error on failure
+      if (!isError) {
+        navigator("/");
+      }
       alert("Registration Successful!");
     } catch (err) {
       // Handle any registration errors
