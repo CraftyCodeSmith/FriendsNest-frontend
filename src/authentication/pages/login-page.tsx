@@ -46,7 +46,7 @@ const LoginPage = () => {
 
   //* =====> states
   const [showPassword, setShowPassword] = useState(false);
-  const [login, { isLoading, isError }] = useLoginMutation(); // Initialize the login mutation
+  const [login, { isLoading }] = useLoginMutation(); // Initialize the login mutation
 
   //* =====> handle functions
   const handleShowPassword = () => {
@@ -73,9 +73,9 @@ const LoginPage = () => {
     }
   };
 
-  const handleNavigateToStreaming = () => {
-    navigator("/streaming");
-  };
+  // const handleNavigateToStreaming = () => {
+  //   navigator("/streaming");
+  // };
 
   //* =====> use-effects
   useEffect(() => {

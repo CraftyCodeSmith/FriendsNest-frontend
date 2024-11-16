@@ -1,7 +1,7 @@
 import { SignalingMessage } from "@/rtc/interface/SignalingMessage";
 import { handleSignalingData } from "@/rtc/service/handleSignalingData";
 import { IMessage, Client as StompClient } from "@stomp/stompjs";
-import { v4 as uuidv4 } from "uuid";
+// import { v4 as uuidv4 } from "uuid";
 import { IStreamingPageProps } from "../interface/StreamingPage";
 
 // Function to base64-url decode a string (URL-safe)
