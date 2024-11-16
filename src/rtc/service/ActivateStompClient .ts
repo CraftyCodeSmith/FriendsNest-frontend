@@ -4,6 +4,34 @@ import { IMessage, Client as StompClient } from "@stomp/stompjs";
 import { v4 as uuidv4 } from "uuid";
 import { IStreamingPageProps } from "../interface/StreamingPage";
 
+// Function to base64-url decode a string (URL-safe)
+function base64UrlDecode(base64Url: any) {
+    // Replace non-url compatible characters with url-safe alternatives
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+
+    // Decode the base64 string
+    const decoded = atob(base64);
+
+    return decoded;
+}
+
+// Function to extract and decode the payload from a JWT
+function extractPayload(token: any) {
+    const parts = token.split('.');  // JWT is in the format header.payload.signature
+
+    if (parts.length !== 3) {
+        throw new Error('Invalid JWT token');
+    }
+
+    // Extract the payload (second part of the token)
+    const payload = base64UrlDecode(parts[1]);
+
+    // Parse the payload to a JSON object
+    const decodedPayload = JSON.parse(payload);
+
+    return decodedPayload;
+}
+
 export const ActivateStompClient = (
     peerConnectionRef: React.MutableRefObject<RTCPeerConnection | null>,
     setError: React.Dispatch<React.SetStateAction<string | null>>,
@@ -12,10 +40,13 @@ export const ActivateStompClient = (
     stompClientRef: React.MutableRefObject<any>,
     setIds: React.Dispatch<React.SetStateAction<string[]>>
 ) => {
-    const clientId = uuidv4();
+    const token = sessionStorage.getItem("authToken");
+    const payload = extractPayload(token);
+    console.log(payload, "payload")
+    const clientId = payload.sub;
     streamingPageProps.myId = clientId; // This could be moved to `useState`
-    const websocketUrl = `ws://192.168.1.104:8080/video-websocket?clientId=${clientId}`;
 
+    const websocketUrl = `ws://192.168.1.12:8080/video-websocket?token=${token}`;
     const client = new StompClient({
         brokerURL: websocketUrl,
         reconnectDelay: 5000, // Reconnect every 5 seconds if connection is lost
@@ -24,7 +55,6 @@ export const ActivateStompClient = (
         debug: (str) => {
             // console.log("STOMP:", str);
         },
-
         onConnect: () => {
             console.log("Connected to STOMP server", stompClientRef);
             streamingPageProps.connectionStatus = true;
@@ -32,7 +62,9 @@ export const ActivateStompClient = (
 
             client.subscribe("/topic/client-update", (message) => {
                 const updatedSessionMap = JSON.parse(message.body);
-                const ids = Object.keys(updatedSessionMap).filter((id) => id !== clientId);
+                console.log(updatedSessionMap)
+                const ids = updatedSessionMap.filter((id: string) => id !== clientId);
+                // const ids = Object.keys(updatedSessionMap).filter((id) => id !== clientId);
                 setIds(ids);
             });
 
